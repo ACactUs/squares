@@ -35,13 +35,14 @@ rectangle_t *rectangle_copy(rectangle_t *rect) {
 
 rectangle_t *rectangle_collision(rectangle_t *left, rectangle_t *right, size_t dt) {
     //rectangle_t *rect   = (rectangle_t*) calloc(2, sizeof(rectangle_t));
+    if ( left == right ) return NULL; 
     rectangle_t *winner = rectangle_compare(left, right);
 
     if ( !winner ) {
         if ( !(rand() % 10)) 
             return NULL;
 
-        if ( rand() % 2) {
+        if ( rand() % 2 ) {
             rectangle_resize_x(left, 0.9);
             rectangle_resize_y(right, 0.9);
         } else {

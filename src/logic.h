@@ -33,16 +33,16 @@ typedef struct {
 int mutate(int eo_target, int e_number, float rate);
 
 typedef enum {
-    RED,
-    GREEN,
-    BLUE
-} COLORS;
+    SQ_RED,
+    SQ_GREEN,
+    SQ_NBLUE
+} SQ_COLORS;
 
 typedef struct {
     int y1, x1, y2, x2;
     double yspeed, xspeed;
     char *name;
-    COLORS color;
+    SQ_COLORS color;
     size_t frags;
     int energy;
     int energy_stored;
