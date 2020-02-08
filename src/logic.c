@@ -12,20 +12,15 @@ void rectangle_destroy(rectangle_t *rect) {
 }
 
 
-void rectangle_resize_x(rectangle_t *rect, float dest_size) { 
-    float delta = (rect->x2 - rect->x1)*dest_size - (rect->x2 - rect->x1);
-    rect->x2 = rect->x2 + floor(delta/2);
-    rect->x1 = rect->x1 + ceil(delta/2);
+void rectangle_resize_x(rectangle_t *rect, float ratio) { 
+    if ( !ratio ) return;
+    rect->width *= ratio;
 }
 
-void rectangle_resize_y(rectangle_t *rect, float dest_size) { 
-    float delta = (rect->x2 - rect->x1)*dest_size - (rect->x2 - rect->x1);
-    rect->x2 = rect->x2 + floor(delta/2);
-    rect->x1 = rect->x1 + ceil(delta/2);
+void rectangle_resize_y(rectangle_t *rect, float ratio) { 
+    if ( !ratio ) return;
+    rect->height *= ratio;
 }
-
-
-
 
 rectangle_t *rectangle_copy(rectangle_t *rect) {
     rectangle_t *copy = rectangle_create();
@@ -34,7 +29,6 @@ rectangle_t *rectangle_copy(rectangle_t *rect) {
 }
 
 rectangle_t *rectangle_collision(rectangle_t *left, rectangle_t *right, size_t dt) {
-    //rectangle_t *rect   = (rectangle_t*) calloc(2, sizeof(rectangle_t));
     if ( left == right ) return NULL; 
     rectangle_t *winner = rectangle_compare(left, right);
 
@@ -43,11 +37,11 @@ rectangle_t *rectangle_collision(rectangle_t *left, rectangle_t *right, size_t d
             return NULL;
 
         if ( rand() % 2 ) {
-            rectangle_resize_x(left, 0.9);
-            rectangle_resize_y(right, 0.9);
+            rectangle_resize_x(left, 0.9f);
+            rectangle_resize_y(right, 0.9f);
         } else {
-            rectangle_resize_y(left, 0.9);
-            rectangle_resize_x(right, 0.9);
+            rectangle_resize_y(left, 0.9f);
+            rectangle_resize_x(right, 0.9f);
         }
     }
     
@@ -62,14 +56,14 @@ rectangle_t *rectangle_collision(rectangle_t *left, rectangle_t *right, size_t d
 }
 
 rectangle_t *rectangle_compare(rectangle_t *left, rectangle_t *right) { 
-    size_t  lsize = rectangle_size(left),
-            rsize = rectangle_size(right);
-    size_t delta = MAX(lsize, rsize) / MIN(rsize, lsize); if ( delta < SIZE_DIFF_TRESHOLD ) return NULL;
+    double  lsize, rsize;
+    lsize = rectangle_size(left),
+    rsize = rectangle_size(right);
+    double delta = MAX(lsize, rsize) / MIN(rsize, lsize); 
+    if ( delta < SIZE_DIFF_TRESHOLD ) return NULL;
     return MAX(rsize, lsize) == rsize ? right : left;
 }
 
-size_t rectangle_size(rectangle_t *rect) { 
-    size_t length = rect->x2 - rect->x1;
-    size_t height = rect->y2 - rect->y1;
-    return length * height;
+double rectangle_size(rectangle_t *rect) { 
+    return (double)(rect->width * rect->height);
 }

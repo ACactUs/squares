@@ -39,7 +39,8 @@ typedef enum {
 } SQ_COLORS;
 
 typedef struct {
-    int y1, x1, y2, x2;
+    double y, x;
+    double height, width;
     double yspeed, xspeed;
     char *name;
     SQ_COLORS color;
@@ -61,8 +62,8 @@ rectangle_t *rectangle_copy(rectangle_t *rect);
 void rectangle_destroy(rectangle_t *rect);
 
 /* modifies rectangle so that it is now dest_size times bigger than original */
-void rectangle_resize_x(rectangle_t *rect, float dest_size);
-void rectangle_resize_y(rectangle_t *rect, float dest_size);
+void rectangle_resize_x(rectangle_t *rect, float ratio);
+void rectangle_resize_y(rectangle_t *rect, float ratio);
 
 /* returns adress of surviving rect, if both survive returns NULL 
  * this function does modify rects */
@@ -72,15 +73,15 @@ rectangle_t *rectangle_collision(rectangle_t *left, rectangle_t *right, size_t d
  * if none returns NULL */
 rectangle_t *rectangle_compare(rectangle_t *left, rectangle_t *right);
 
-size_t rectangle_size(rectangle_t *rect);
+double rectangle_size(rectangle_t *rect);
 
 
 
 typedef struct {
-    size_t ysize, xsize;
-    size_t rect_count;
-    rectangle_t **rect_array;
-    // Decorations
+    double ysize, xsize;
+    size_t rect_alive;
+    size_t rect_max;    /*keeps max number of rects therefore can be used by calloc*/
+    rectangle_t **rects;
 } plane_t;
 
 void frame_render(plane_t plane);
