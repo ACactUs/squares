@@ -30,7 +30,7 @@ typedef struct {
     int size;
 } traits_opt_t;
 
-int mutate(int eo_target, int e_number, float rate);
+int mutate(int eo_target, int e_number, float rate); 
 
 typedef enum {
     SQ_RED,
@@ -92,3 +92,11 @@ void action_nostim(plane_t *plane, rectangle_t *square);
 void action_food(plane_t *plane, rectangle_t *square);
 void action_big(plane_t *plane, rectangle_t *square);
 void action_pray(plane_t *plane, rectangle_t *square);
+
+
+plane_t *plane_create(double xsize, double ysize); /*done*/
+
+/* if rects is NULL, plane will be initialized with random rects */
+void plane_init(plane_t *plane, rectangle_t **rects, size_t rects_size); 
+
+void plane_destroy(plane_t *plane); /*done*/

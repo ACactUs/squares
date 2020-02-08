@@ -14,42 +14,62 @@ void render_greeting(render_state_t *state) {
 
 
 void render_frame(render_state_t *state){
-    //TODO
     size_t rect_max = state->plane->rect_max;
     size_t i;
     for (i = 0; i < rect_max; i++) {
         rectangle_t *rect = state->plane->rects[i];
         if (!rect) continue;
+        render_rectangle(state, i);
     }
 }
 
-void render_rectangle(render_state_t *state, size_t rect_num) {
-    //TODO
-    render_status(state, "Cant render rectangle yet");
-    return; /*DEAD CODE FOLLOWS!*/
-
-    if (rect_num >= state->plane->rect_max) {
+void render_rectangle(render_state_t *state, size_t index) {
+    WINDOW *win = state->rect_wins[index];
+    if (index >= state->plane->rect_max) {
         render_status(state, "ERR: Index too big at render_rectangle!... press any key");
         wgetch(state->status);
+        return;
     }
 
-    rectangle_t *rect = state->plane->rects[rect_num];
+    rectangle_t *rect = state->plane->rects[index];
+
     if (!rect) {
         render_status(state, "ERR: Rect does not exist at render_rectangle... press any key");
         wgetch(state->status);
+        return;
     }
-    /*move rect win*/
+
+    if (!win) {
+        render_status(state, "ERR: Rect window for this index does not exist... press any key");
+        wgetch(state->status);
+        return;
+    }
+
     
     /*FIXME*/
-    /*resize rect win*/
+    /*move rect win*/
     int lines, cols;
-    lines = (int)(rect->height);
+    lines = (int)(rect->height); 
     cols  = (int)(rect->width);
     if (lines < 1) lines = 1;
     if (cols  < 1) cols  = 1;
-    //resize 1x1
-    //move
-    //resize h*w
+
+    int mresp = mvwin(win, (int)rect->y, (int)rect->x);
+    int rresp = wresize(win, lines, cols);
+
+
+    /*resize rect win*/
+    if ((ERR == mresp) | (ERR == rresp)) {
+        render_status(state, "ERR: could not move window, render canceled... press any key");
+        wgetch(state->status);
+        return;
+        //resize 1x1 TODO
+        //move
+        //resize h*w
+    }
+    
+    box(win, 0, 0);
+    wrefresh(win);
 }
 
 void render_load(render_state_t *state, plane_t *plane) {

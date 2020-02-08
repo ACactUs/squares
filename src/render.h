@@ -29,8 +29,7 @@ void zoom_set(plane_t *plane);
 
 void render_frame(render_state_t *state); /*done*/
 
-void render_rectangle(render_state_t *state, size_t rect_num); /*defined*/
-
+void render_rectangle(render_state_t *state, size_t index); /*defined*/
 
 void render_status(render_state_t *state, char *message); /*done*/
 
