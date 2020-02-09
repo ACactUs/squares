@@ -74,16 +74,20 @@ void  plane_init(plane_t *plane, rectangle_t **rects, size_t recs_size) {
     plane->rects = calloc(sizeof(rectangle_t*), recs_size);
     plane->rect_max = recs_size;
     if (!rects){
-        /*no rects given, therefore create them accordingly to config globals*/
+        /* no rects given, therefore create them accordingly to config globals
+         * TODO kill intersecting ones*/
         size_t i;
         for(i = 0; i < recs_size; i++) {
             /*FIXME FIXME FIXME hardcoding rules*/
             rectangle_t *rect = plane->rects[i] = rectangle_create();
-            rect->width     = 20;
-            rect->height    = 7;
-            rect->x         = 40;
-            rect->y         = 4;
+            rect->width     = rand() % (WIDTH_INIT_MAX - WIDTH_INIT_MIN + 1) + WIDTH_INIT_MIN;
+            rect->height    = rand() % (HEIGHT_INIT_MAX - HEIGHT_INIT_MIN + 1) + HEIGHT_INIT_MIN;
+            rect->x         = rand() % (int)(plane->xsize - rect->width);
+            rect->y         = rand() % (int)(plane->ysize - rect->height);
+            rect->energy    = 100; //FIXME has no meaning
+            //TODO initialize actions randomly
         }
+         /* TODO beter initialization*/
     } else { 
         /*load existing rects*/
         exit(1); 

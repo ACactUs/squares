@@ -9,6 +9,8 @@ void render_greeting(render_state_t *state) {
     mvwprintw(greetings, 2, 2, "Please, do not resize the terminal");
     render_status(state, "Statusbar initialized..... OK");
     wgetch(greetings);
+    wclear(greetings);
+    wrefresh(greetings);
     delwin(greetings);
 }
 
