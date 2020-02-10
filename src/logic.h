@@ -11,6 +11,7 @@
 #define HEIGHT_INIT_MAX 10
 #define SPEED_INIT_MAX  4
 #define SPEED_ABS_MAX   15
+#define RECTANGLE_INIT_MAX_RETRIES 10
 
 /*END CONFIG*/
 
@@ -70,6 +71,8 @@ rectangle_t *rectangle_copy(rectangle_t *rect); /*done*/
 
 void rectangle_destroy(rectangle_t *rect); /*done*/
 
+int rectangle_check_collision(rectangle_t *left, rectangle_t *right); /*done*/
+
 /* modifies rectangle so that it is now dest_size times bigger than original */
 void rectangle_resize_x(rectangle_t *rect, float ratio); /*done*/
 void rectangle_resize_y(rectangle_t *rect, float ratio); /*done*/
@@ -86,6 +89,7 @@ double rectangle_size(rectangle_t *rect); /*done*/
 
 
 
+
 typedef struct {
     double ysize, xsize;
     size_t rect_alive;
@@ -93,15 +97,21 @@ typedef struct {
     rectangle_t **rects;
 } plane_t;
 
+
 void frame_render(plane_t plane); /*done*/
 
 void frame_simulate(plane_t plane); /*TODO choose ticks or rt*/
 
-void action_nostim(plane_t *plane, rectangle_t *square);
-void action_food(plane_t *plane, rectangle_t *square);
-void action_big(plane_t *plane, rectangle_t *square);
-void action_pray(plane_t *plane, rectangle_t *square);
+void action_nostim  (plane_t *plane, size_t index); /*partially*/
+void action_food    (plane_t *plane, size_t index); /*partially*/
+void action_big     (plane_t *plane, size_t index); /*partially*/
+void action_pray    (plane_t *plane, size_t index); /*partially*/
 
+void rectangle_hybernate    (plane_t *plane, size_t index); 
+void rectangle_move_random  (plane_t *plane, size_t index); 
+void rectangle_move_lrandom (plane_t *plane, size_t index); 
+void rectangle_move_avoid   (plane_t *plane, size_t index); 
+void rectangle_move_seek    (plane_t *plane, size_t index); 
 
 plane_t *plane_create(double xsize, double ysize); /*done*/
 
@@ -111,4 +121,4 @@ void plane_init(plane_t *plane, rectangle_t **rects, size_t rects_size); /*done*
 void plane_destroy(plane_t *plane); /*done*/
 
 /*returns first collision or NULL if none*/
-rectangle_t *plane_check_collision(plane_t *plane, rectangle_t *rectangle);
+rectangle_t *plane_check_collisions(plane_t *plane, size_t index);

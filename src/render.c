@@ -47,6 +47,7 @@ void render_rectangle(render_state_t *state, size_t index) {
         return;
     }
 
+    wclear(win);
     
     /*FIXME*/
     /*move rect win*/
