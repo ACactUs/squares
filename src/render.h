@@ -1,5 +1,9 @@
 #include <ncurses.h>
+#include <time.h>
 #include "logic.h"
+
+
+#define RENDER_NSEC  500000000LL
 
 enum zoom       { zo_none };
 enum color_pairs{ cp_wb=1, cp_bw };
@@ -15,6 +19,8 @@ typedef struct {
                       * as their windows in render_state_t->rect_wins 
                       * if rectangle is dead then corresponding index in plane_t and
                       * in render_state_t point to NULL element*/
+   struct timespec ts_last;
+   struct timespec ts_init;
 } render_state_t;
 
 render_state_t *render_init(); /*done*/

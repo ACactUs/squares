@@ -5,20 +5,19 @@
 #include "render.h"
 #include "logic.h"
 
-int main(int argc, char **argv){
+int main(){
     srand((unsigned int)time(NULL));
     render_state_t *state = render_init();
 
     render_greeting(state);
     plane_t *plane = plane_create(state->maxx, state->maxy);
-    plane_init(plane, NULL, 11);
+    plane_init(plane, NULL, 12);
 
     render_load(state, plane);
     
     while (true) {
         render_frame(state);
-        wgetch(state->status);
-        render_status(state, "OK: Frame rendered_successfully");
+        frame_simulate(plane);
     }
 
     return 0;

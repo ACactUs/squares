@@ -2,18 +2,22 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 /*CONFIG*/
-#define SIZE_DIFF_TRESHOLD 1.2f
-#define WIDTH_INIT_MIN  4
-#define WIDTH_INIT_MAX  10
-#define HEIGHT_INIT_MIN 4
-#define HEIGHT_INIT_MAX 10
-#define SPEED_INIT_MAX  4
-#define SPEED_ABS_MAX   15
-#define RECTANGLE_INIT_MAX_RETRIES 10
-
+#define SIZE_DIFF_TRESHOLD          1.2f
+#define WIDTH_INIT_MIN              4
+#define WIDTH_INIT_MAX              10
+#define HEIGHT_INIT_MIN             4
+#define HEIGHT_INIT_MAX             10
+#define SPEED_INIT_MAX              4
+#define SPEED_ABS_MAX               15
+#define RECTANGLE_INIT_MAX_RETRIES  10
+#define TICK_NSEC                   500000000
 /*END CONFIG*/
+
+/* IMPORTANT NOTICE
+ * speed is given in distance units per second */
 
 #define MAX(a,b) ((a) > (b) ? a : b)
 #define MIN(a,b) ((a) < (b) ? a : b)
@@ -24,6 +28,8 @@ enum no_stim    { so_idle, so_random, so_lrandom, SE_NUMBER };
 enum food       { fo_idle, fo_random, fo_lrandom, fo_avoid, fo_seek, FE_NUMBER };
 enum big        { bo_idle, bo_random, bo_lrandom, bo_avoid, bo_seek, BE_NUMBER };
 enum pray       { po_idle, po_random, po_lrandom, po_avoid, po_seek, PE_NUMBER };
+
+enum actions    { a_no_stim, a_food, a_big, a_pray }; 
 
 /* traits index kept in enum are used to access items in traits array */
 enum traits     { ti_mspeed=0, ti_avoid_dist, ti_avoid_speed, t_pursue_speed, t_food_speed, TIE_NUMBER };
@@ -89,19 +95,22 @@ double rectangle_size(rectangle_t *rect); /*done*/
 
 
 
-
 typedef struct {
     double ysize, xsize;
     size_t rect_alive;
     size_t rect_max;    /*keeps max number of rects therefore can be used by calloc*/
     rectangle_t **rects;
+    struct timespec ts_init;
+    struct timespec ts_curr;
 } plane_t;
 
 
 void frame_render(plane_t plane); /*done*/
 
-void frame_simulate(plane_t plane); /*TODO choose ticks or rt*/
+void frame_simulate(plane_t *plane); /*ticks chosen*/
 
+/* these functions are not responsible for rectangle movement simulation,
+ * they only change rectangle state as it is dictated by behaviour vars*/
 void action_nostim  (plane_t *plane, size_t index); /*partially*/
 void action_food    (plane_t *plane, size_t index); /*partially*/
 void action_big     (plane_t *plane, size_t index); /*partially*/
@@ -113,11 +122,25 @@ void rectangle_move_lrandom (plane_t *plane, size_t index);
 void rectangle_move_avoid   (plane_t *plane, size_t index); 
 void rectangle_move_seek    (plane_t *plane, size_t index); 
 
+/*this function is used to manage energy spendings for movement*/
+void rectangle_accelerate(rectangle_t *rect, double x, double y);
+
+/*returns enum value of action which will be delegated to rectangle*/
+enum actions rectangle_action_get(plane_t *plane, size_t index);
+
+/*performs one of N possible actions determined by rectangle_action_get*/
+void rectangle_act(plane_t *plane, size_t index);
+
+/* changes rectangle coordinates and resolves collisions for one tick 
+ * breaks if index, plane or rectangle is invalid*/
+void rectangle_simulate(plane_t *plane, size_t index);
+
 plane_t *plane_create(double xsize, double ysize); /*done*/
 
 /* if rects is NULL, plane will be initialized with random rects */
 void plane_init(plane_t *plane, rectangle_t **rects, size_t rects_size); /*done*/
 
+/* need func which conditions plane reset*/
 void plane_destroy(plane_t *plane); /*done*/
 
 /*returns first collision or NULL if none*/

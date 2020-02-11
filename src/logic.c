@@ -145,11 +145,89 @@ void action_pray(plane_t *plane, size_t index) {
     }
 }
 
-void rectangle_hybernate    (plane_t *plane, size_t index) {exit(1);}
-void rectangle_move_random  (plane_t *plane, size_t index) {exit(1);}
-void rectangle_move_lrandom (plane_t *plane, size_t index) {exit(1);}
-void rectangle_move_avoid   (plane_t *plane, size_t index) {exit(1);}
-void rectangle_move_seek    (plane_t *plane, size_t index) {exit(1);}
+void rectangle_TESTMOVE     (plane_t *plane, size_t index) { 
+    rectangle_t *rect = plane->rects[index];
+    rect->xspeed = 1;
+    rect->yspeed = 1;
+    return;
+}
+
+void rectangle_hybernate    (plane_t *plane, size_t index) { rectangle_TESTMOVE(plane, index); }
+void rectangle_move_random  (plane_t *plane, size_t index) { rectangle_TESTMOVE(plane, index); }
+void rectangle_move_lrandom (plane_t *plane, size_t index) { rectangle_TESTMOVE(plane, index); }
+void rectangle_move_avoid   (plane_t *plane, size_t index) { rectangle_TESTMOVE(plane, index); }
+void rectangle_move_seek    (plane_t *plane, size_t index) { rectangle_TESTMOVE(plane, index); }
+
+
+void frame_simulate(plane_t *plane) {
+    //TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    long long nsec_elapsed = (ts.tv_sec - plane->ts_curr.tv_sec) * 1000000000LL
+                                    + ts.tv_nsec - plane->ts_curr.tv_nsec;
+
+    if (nsec_elapsed < TICK_NSEC) {
+        clock_gettime(CLOCK_MONOTONIC, &plane->ts_curr);
+        ts.tv_sec  = 0;
+        while (nsec_elapsed >= 1000000000LL) {
+            ts.tv_sec++;
+            nsec_elapsed -= 1000000000LL;
+        }
+        ts.tv_nsec = nsec_elapsed;
+        nanosleep(&ts, NULL);
+    }
+
+    size_t max = plane->rect_max;
+    size_t i;
+    for (i = 0; i < max; i++) {
+        if (!plane->rects[i]) continue;
+        rectangle_act(plane, i);
+    }
+    clock_gettime(CLOCK_MONOTONIC, &plane->ts_curr);
+}
+
+
+enum actions rectangle_action_get(plane_t *plane, size_t index) {
+    //FIXME, only one branch defined yet
+    return a_no_stim;
+}
+
+void rectangle_act(plane_t *plane, size_t index) {
+    //TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO 
+    enum actions action = rectangle_action_get(plane, index);
+    switch (action) {
+        case a_no_stim:
+            action_nostim(plane, index);
+            break;
+        case a_food:
+            action_food(plane, index);
+            break;
+        case a_big:
+            action_big(plane, index);
+            break;
+        case a_pray:
+            action_pray(plane, index);
+            break;
+    }
+    rectangle_simulate(plane, index);
+}
+
+void rectangle_simulate(plane_t *plane, size_t index) {
+    /**/
+    rectangle_t *rect = plane->rects[index];
+    double nx, ny;
+    /*
+     * FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME 
+     *
+    nx = rect->x + (rect->xspeed) * (TICK_NSEC/1000000000LL);
+    ny = rect->y + (rect->yspeed) * (TICK_NSEC/1000000000LL);
+    rect->x = nx;
+    rect->y = ny;
+    */
+    rect->x++; rect->y++;
+    //FIXME COLLISIONS AND BORDERS CHECK
+    //FIXME ENERGY SPENDING
+}
 
 rectangle_t *rectangle_compare(rectangle_t *left, rectangle_t *right) { 
     double  lsize, rsize;
@@ -177,6 +255,8 @@ void _rectangle_init_randomly(plane_t *plane, rectangle_t *rect) {
 void  plane_init(plane_t *plane, rectangle_t **rects, size_t recs_size) {
     plane->rects = calloc(sizeof(rectangle_t*), recs_size);
     plane->rect_max = recs_size;
+    clock_gettime(CLOCK_MONOTONIC, &plane->ts_init);
+    clock_gettime(CLOCK_MONOTONIC, &plane->ts_curr);
     if (!rects){
         /* no rects given, therefore create them accordingly to config globals
          * TODO kill intersecting ones*/

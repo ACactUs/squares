@@ -1,5 +1,6 @@
 #include "render.h"
 #include "logic.h"
+#include <time.h>
 #include <curses.h>
 #include <string.h>
 
@@ -14,8 +15,12 @@ void render_greeting(render_state_t *state) {
     delwin(greetings);
 }
 
-
 void render_frame(render_state_t *state){
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    long long nsec_elapsed = (ts.tv_sec - state->ts_last.tv_sec) * 1000000000LL
+                                    + ts.tv_nsec - state->ts_last.tv_nsec;
+
     size_t rect_max = state->plane->rect_max;
     size_t i;
     for (i = 0; i < rect_max; i++) {
@@ -23,6 +28,7 @@ void render_frame(render_state_t *state){
         if (!rect) continue;
         render_rectangle(state, i);
     }
+    clock_gettime(CLOCK_MONOTONIC, &state->ts_last);
 }
 
 void render_rectangle(render_state_t *state, size_t index) {
@@ -48,6 +54,7 @@ void render_rectangle(render_state_t *state, size_t index) {
     }
 
     wclear(win);
+    wrefresh(win);
     
     /*FIXME*/
     /*move rect win*/
@@ -129,12 +136,11 @@ render_state_t *render_init() {
     //init_pair(cp_bw, -1, COLOR_WHITE);
 
     getmaxyx(stdscr, state->maxy, state->maxx);
-    
     state->status = newwin(1, state->maxx, state->maxy-1, 0);
     state->plane  = NULL;
-    
+    clock_gettime(CLOCK_MONOTONIC, &state->ts_init);
+    clock_gettime(CLOCK_MONOTONIC, &state->ts_last);
     wattron(state->status, A_REVERSE);
-
     noecho();
     return state;
 }
