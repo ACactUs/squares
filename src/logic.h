@@ -13,7 +13,7 @@
 #define SPEED_INIT_MAX              4
 #define SPEED_ABS_MAX               15
 #define RECTANGLE_INIT_MAX_RETRIES  10
-#define TICK_NSEC                   500000000
+#define TICK_NSEC                   5000000LL           /*500ticks/sec*/
 /*END CONFIG*/
 
 /* IMPORTANT NOTICE

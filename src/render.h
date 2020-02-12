@@ -3,7 +3,7 @@
 #include "logic.h"
 
 
-#define RENDER_NSEC  500000000LL
+#define RENDER_NSEC  16666666LL             /*60fps*/
 
 enum zoom       { zo_none };
 enum color_pairs{ cp_wb=1, cp_bw };

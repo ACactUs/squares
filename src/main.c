@@ -11,13 +11,13 @@ int main(){
 
     render_greeting(state);
     plane_t *plane = plane_create(state->maxx, state->maxy);
-    plane_init(plane, NULL, 12);
+    plane_init(plane, NULL, 7);
 
     render_load(state, plane);
     
     while (true) {
-        render_frame(state);
         frame_simulate(plane);
+        render_frame(state);
     }
 
     return 0;

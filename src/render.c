@@ -20,6 +20,7 @@ void render_frame(render_state_t *state){
     clock_gettime(CLOCK_MONOTONIC, &ts);
     long long nsec_elapsed = (ts.tv_sec - state->ts_last.tv_sec) * 1000000000LL
                                     + ts.tv_nsec - state->ts_last.tv_nsec;
+    if (nsec_elapsed < RENDER_NSEC) return;
 
     size_t rect_max = state->plane->rect_max;
     size_t i;

@@ -147,8 +147,8 @@ void action_pray(plane_t *plane, size_t index) {
 
 void rectangle_TESTMOVE     (plane_t *plane, size_t index) { 
     rectangle_t *rect = plane->rects[index];
-    rect->xspeed = 1;
-    rect->yspeed = 1;
+    rect->xspeed = 0.5;
+    rect->yspeed = 0.5;
     return;
 }
 
@@ -166,14 +166,16 @@ void frame_simulate(plane_t *plane) {
     long long nsec_elapsed = (ts.tv_sec - plane->ts_curr.tv_sec) * 1000000000LL
                                     + ts.tv_nsec - plane->ts_curr.tv_nsec;
 
+
     if (nsec_elapsed < TICK_NSEC) {
-        clock_gettime(CLOCK_MONOTONIC, &plane->ts_curr);
+        //clock_gettime(CLOCK_MONOTONIC, &plane->ts_curr);
+        long long wait_nsec = TICK_NSEC - nsec_elapsed;
         ts.tv_sec  = 0;
-        while (nsec_elapsed >= 1000000000LL) {
+        while (wait_nsec >= 1000000000LL) {
             ts.tv_sec++;
-            nsec_elapsed -= 1000000000LL;
+            wait_nsec -= 1000000000LL;
         }
-        ts.tv_nsec = nsec_elapsed;
+        ts.tv_nsec = wait_nsec;
         nanosleep(&ts, NULL);
     }
 
@@ -218,13 +220,12 @@ void rectangle_simulate(plane_t *plane, size_t index) {
     double nx, ny;
     /*
      * FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME 
-     *
-    nx = rect->x + (rect->xspeed) * (TICK_NSEC/1000000000LL);
-    ny = rect->y + (rect->yspeed) * (TICK_NSEC/1000000000LL);
+     */
+    //delta  = speed * TICK_NSEC / 1000000000LL
+    nx = rect->x + (rect->xspeed) * ((long double)TICK_NSEC/(long double)1000000000LL);
+    ny = rect->y + (rect->yspeed) * ((long double)TICK_NSEC/(long double)1000000000LL);
     rect->x = nx;
     rect->y = ny;
-    */
-    rect->x++; rect->y++;
     //FIXME COLLISIONS AND BORDERS CHECK
     //FIXME ENERGY SPENDING
 }
@@ -266,7 +267,7 @@ void  plane_init(plane_t *plane, rectangle_t **rects, size_t recs_size) {
             _rectangle_init_randomly(plane, rect);
             size_t j = 0;
             while (j++ < RECTANGLE_INIT_MAX_RETRIES) 
-                if (!plane_check_collisions(plane, i)) continue;
+                if (!plane_check_collisions(plane, i)) break;
                 _rectangle_init_randomly(plane, rect);        
         }
         /* TODO beter initialization*/
