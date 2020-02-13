@@ -13,7 +13,8 @@
 #define SPEED_INIT_MAX              4
 #define SPEED_ABS_MAX               15
 #define RECTANGLE_INIT_MAX_RETRIES  10
-#define TICK_NSEC                   5000000LL           /*500ticks/sec*/
+#define TICK_NSEC                   5000000LL   /* 500ticks/sec */
+#define BOUNCE_SPEED_FINE           0.4         /* spd = spd - spd*fine*/
 /*END CONFIG*/
 
 /* IMPORTANT NOTICE
@@ -62,10 +63,11 @@ typedef struct {
     char *name;
     SQ_COLORS color;
     size_t frags;
-    int energy;
-    int energy_stored;
-    int ticks_idle;
-    int move_time;
+    double energy;
+    double energy_stored;
+    size_t ticks_idle;          /* number of ticks w/o stimuli */
+    struct timespec timer;      /* timespec of an event */
+    int move_time;              /* ??? */
     actions_opt_t actions;
     traits_opt_t traits;
 } rectangle_t;
@@ -83,9 +85,6 @@ int rectangle_check_collision(rectangle_t *left, rectangle_t *right); /*done*/
 void rectangle_resize_x(rectangle_t *rect, float ratio); /*done*/
 void rectangle_resize_y(rectangle_t *rect, float ratio); /*done*/
 
-/* returns adress of surviving rect, if both survive returns NULL 
- * this function does modify rects */
-rectangle_t *rectangle_collision(rectangle_t *left, rectangle_t *right, size_t dt); /*done, TODO bounceback*/
 
 /* return adress of winning rect,
  * if none returns NULL */
@@ -143,5 +142,17 @@ void plane_init(plane_t *plane, rectangle_t **rects, size_t rects_size); /*done*
 /* need func which conditions plane reset*/
 void plane_destroy(plane_t *plane); /*done*/
 
-/*returns first collision or NULL if none*/
-rectangle_t *plane_check_collisions(plane_t *plane, size_t index);
+/*returns first collision rectangle index, sets flag true if collision happened*/
+size_t plane_check_collisions(plane_t *plane, size_t index, int *flag_collided); 
+
+/* should be called on collision, manages rectagles fight only */
+void rectangle_collision_fight(plane_t *plane, size_t left, size_t right); /*done*/
+
+/* completely resolves two rectangles collision recursively 
+ * only spends collision tunneled movement
+ * it may affect another rectangles */
+void rectangle_collision_resolve(plane_t *plane, size_t left); /*done*/
+
+/* checks for and resolves borders collision in this iteration
+ * returns true if resolution did happen, false if nothing was changed */
+int rectangle_borders_resolve(plane_t *plane, size_t index); /*TODO move code from rectangle_simulate */

@@ -13,6 +13,8 @@ void render_greeting(render_state_t *state) {
     wclear(greetings);
     wrefresh(greetings);
     delwin(greetings);
+    box(state->canvas, 0, 0);
+    wrefresh(state->canvas);
 }
 
 void render_frame(render_state_t *state){
@@ -57,8 +59,6 @@ void render_rectangle(render_state_t *state, size_t index) {
     wclear(win);
     wrefresh(win);
     
-    /*FIXME*/
-    /*move rect win*/
     int lines, cols;
     lines = (int)(rect->height); 
     cols  = (int)(rect->width);
@@ -137,12 +137,16 @@ render_state_t *render_init() {
     //init_pair(cp_bw, -1, COLOR_WHITE);
 
     getmaxyx(stdscr, state->maxy, state->maxx);
+    state->canv_maxx = state->maxx;
+    state->canv_maxy = state->maxy - 1;
     state->status = newwin(1, state->maxx, state->maxy-1, 0);
     state->plane  = NULL;
+    state->canvas = newwin(state->canv_maxy, state->maxx, 0, 0);
     clock_gettime(CLOCK_MONOTONIC, &state->ts_init);
     clock_gettime(CLOCK_MONOTONIC, &state->ts_last);
     wattron(state->status, A_REVERSE);
     noecho();
+    refresh();
     return state;
 }
 

@@ -1,4 +1,5 @@
 #include "logic.h"
+#include <curses.h>
 #include <math.h>
 
 rectangle_t *rectangle_create() {
@@ -27,31 +28,36 @@ rectangle_t *rectangle_copy(rectangle_t *rect) {
     return copy;
 }
 
-rectangle_t *rectangle_collision(rectangle_t *left, rectangle_t *right, size_t dt) {
-    if ( left == right ) return NULL; 
-    rectangle_t *winner = rectangle_compare(left, right);
+void rectangle_collision_fight(plane_t *plane, size_t left, size_t right) {
+    if (left == right) return; 
 
-    if ( !winner ) {
-        if ( !(rand() % 10)) 
-            return NULL;
+    rectangle_t *lrect, *rrect;
+    lrect = plane->rects[left];
+    rrect = plane->rects[right]; 
 
-        if ( rand() % 2 ) {
-            rectangle_resize_x(left, 0.9f);
-            rectangle_resize_y(right, 0.9f);
+    rectangle_t *winner = rectangle_compare(lrect, rrect);
+
+    if (!winner) {
+        if (!(rand() % 10)) 
+            return;
+
+        if (rand() % 2) {
+            rectangle_resize_x(lrect, 0.9f);
+            rectangle_resize_y(rrect, 0.9f);
         } else {
-            rectangle_resize_y(left, 0.9f);
-            rectangle_resize_x(right, 0.9f);
+            rectangle_resize_y(lrect, 0.9f);
+            rectangle_resize_x(rrect, 0.9f);
         }
     }
     
     //TODO
     /* some genetic logic may be defined here
      * for now just kill smaller one */
-    rectangle_t *looser = (winner == left) ? right : left;
+    rectangle_t *looser = (winner == lrect) ? rrect : lrect;
 
     rectangle_destroy(looser);
 
-    return winner;
+    return;
 }
 
 void action_nostim(plane_t *plane, size_t index) {
@@ -147,8 +153,8 @@ void action_pray(plane_t *plane, size_t index) {
 
 void rectangle_TESTMOVE     (plane_t *plane, size_t index) { 
     rectangle_t *rect = plane->rects[index];
-    rect->xspeed = 0.5;
-    rect->yspeed = 0.5;
+    rect->xspeed = 2;
+    rect->yspeed = 2;
     return;
 }
 
@@ -214,20 +220,97 @@ void rectangle_act(plane_t *plane, size_t index) {
     rectangle_simulate(plane, index);
 }
 
+int rectangle_borders_resolve(plane_t *plane, size_t index) {
+    //FIXME MOVE CODE
+}
+
+void rectangle_collision_resolve(plane_t *plane, size_t index) {
+    int flag_collided;
+    size_t col_index = plane_check_collisions(plane, index, &flag_collided);
+    if (!flag_collided) { /* if no rect collision check borders */
+        if(rectangle_borders_resolve(plane, index)) /* if changed go deeper */
+            rectangle_collision_resolve(plane, index);
+        return; /* no rect collision and no border collision exit recursion */
+    }
+
+    /* rect collision happened, resolve by tunneling distance then go deeper */
+    
+    /* go deeper */
+    //FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME 
+    rectangle_t *r = plane->rects[index];
+    rectangle_t *t = plane->rects[col_index];
+    /* else if are chained to prevent double bounceback on angle collision */
+    //UP
+    if (r->y > t->y && r->y < t->y + t->height) {
+        double overshoot = r->y - t->y - t->height; //<0 checked
+        r->y -= 2*overshoot;
+    } 
+    //DOWN
+    else if (r->y + r->height > t->y && r->y + r->height < t->y + t->height) {
+        double overshoot = r->y + r->height - t->y; //>0 checked
+        r->y -= 2*overshoot;
+    }     
+    //LEFT
+    else if (r->x > t->x && r->x < t->x + t->width) {
+        double overshoot = r->x - t->y - t->width; //<0 checked
+        r->x -= 2*overshoot;
+    }
+    //RIGHT
+    else if (r->x + r->width > t->x && r->x + r->width < t->x + t->width) {
+        double overshoot = r->x + r->width - t->width; //>0 checked
+        r->x -= 2*overshoot;
+    }
+
+    rectangle_collision_resolve(plane, index);
+}
+
 void rectangle_simulate(plane_t *plane, size_t index) {
-    /**/
     rectangle_t *rect = plane->rects[index];
     double nx, ny;
-    /*
-     * FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME 
-     */
-    //delta  = speed * TICK_NSEC / 1000000000LL
     nx = rect->x + (rect->xspeed) * ((long double)TICK_NSEC/(long double)1000000000LL);
     ny = rect->y + (rect->yspeed) * ((long double)TICK_NSEC/(long double)1000000000LL);
     rect->x = nx;
     rect->y = ny;
-    //FIXME COLLISIONS AND BORDERS CHECK
-    //FIXME ENERGY SPENDING
+
+    //FIXME this function does not yet respect rectangle actions
+    
+    /* continue checks untill resolved, 
+     * if no changes were made during iteration, unset unresolved flag */
+    //FIXME move code to borders_resolve
+    int unresolved = TRUE;
+    while (unresolved) {
+        /* TODO move to rectangle_borders_resolve */
+        /* top */
+        unresolved = FALSE;
+        if (rect->y < 0 ) {
+            rect->y = -rect->y;
+            unresolved = TRUE;
+        } 
+        /* bot */
+        else if (rect->y > plane->ysize) {
+            double overflow = rect->y - plane->ysize;
+            rect->y = -overflow;
+            unresolved = TRUE;
+        }
+        /* left */
+        if (rect->x < 0) {
+            rect->x = -rect->x;
+            unresolved = TRUE;
+        }
+        /* right */
+        else if (rect->x + rect->width > plane->xsize) { 
+            double overflow = rect->x - plane->xsize;
+            rect->x = -overflow;
+            unresolved = TRUE;
+        }
+        /* END BORDERS */    
+        /* FIXME this must be handles by rectangle_collision_resolve 
+        int flag_collided = false;
+        size_t collided_with = plane_check_collisions(plane, index, &flag_collided);
+        if (flag_collided) rectangle_collision_resolve(plane, index, collided_with);
+        */
+        rectangle_collision_resolve(plane, index);
+    }
 }
 
 rectangle_t *rectangle_compare(rectangle_t *left, rectangle_t *right) { 
@@ -252,7 +335,6 @@ void _rectangle_init_randomly(plane_t *plane, rectangle_t *rect) {
     //TODO initialize actions randomly
 }
 
-/*FIXME add rects count variable and remove it from plane_create*/
 void  plane_init(plane_t *plane, rectangle_t **rects, size_t recs_size) {
     plane->rects = calloc(sizeof(rectangle_t*), recs_size);
     plane->rect_max = recs_size;
@@ -266,9 +348,12 @@ void  plane_init(plane_t *plane, rectangle_t **rects, size_t recs_size) {
             rectangle_t *rect = plane->rects[i] = rectangle_create();
             _rectangle_init_randomly(plane, rect);
             size_t j = 0;
-            while (j++ < RECTANGLE_INIT_MAX_RETRIES) 
-                if (!plane_check_collisions(plane, i)) break;
+            int flag_collided = false;
+            while (j++ < RECTANGLE_INIT_MAX_RETRIES) { 
+                plane_check_collisions(plane, i, &flag_collided);
+                if (!flag_collided) break;
                 _rectangle_init_randomly(plane, rect);        
+            }
         }
         /* TODO beter initialization*/
     } else { 
@@ -299,16 +384,21 @@ void plane_destroy(plane_t *plane) {
 
 /* Checks for collisions for rectangle of given index 
  * WARN assumes that index is valid 
- * this function does check for NULL rectangles at index */
-rectangle_t *plane_check_collisions(plane_t *plane, size_t index) {
+ * this function does not check for NULL rectangles at index 
+ * return size_t index of collision rectangle
+ * if collision happed set flag to true if not, false and return 0 */
+size_t plane_check_collisions(plane_t *plane, size_t index, int *flag_collided) {
     size_t i;
     rectangle_t *rect = plane->rects[index];
-    if (!rect) return NULL;
     for (i = 0; i < plane->rect_max; i++) {
         rectangle_t *curr = plane->rects[i];
         if (!curr) continue;
-        if (rectangle_check_collision(curr, rect) && rect != curr) return curr;
+        if (rectangle_check_collision(curr, rect) && rect != curr) {
+            *flag_collided = true;
+            return i;
+        }
     }
+    *flag_collided = false;
     return NULL;
 }
 

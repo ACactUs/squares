@@ -10,8 +10,8 @@ int main(){
     render_state_t *state = render_init();
 
     render_greeting(state);
-    plane_t *plane = plane_create(state->maxx, state->maxy);
-    plane_init(plane, NULL, 7);
+    plane_t *plane = plane_create(state->canv_maxx, state->canv_maxy);
+    plane_init(plane, NULL, 8);
 
     render_load(state, plane);
     
