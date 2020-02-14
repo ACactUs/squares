@@ -77,6 +77,8 @@ rectangle_t *rectangle_create(); /*done*/
 
 rectangle_t *rectangle_copy(rectangle_t *rect); /*done*/
 
+
+
 void rectangle_destroy(rectangle_t *rect); /*done*/
 
 int rectangle_check_collision(rectangle_t *left, rectangle_t *right); /*done*/
@@ -141,6 +143,8 @@ void plane_init(plane_t *plane, rectangle_t **rects, size_t rects_size); /*done*
 
 /* need func which conditions plane reset*/
 void plane_destroy(plane_t *plane); /*done*/
+
+void plane_remove_rectangle(plane_t *plane, size_t index);
 
 /*returns first collision rectangle index, sets flag true if collision happened*/
 size_t plane_check_collisions(plane_t *plane, size_t index, int *flag_collided); 

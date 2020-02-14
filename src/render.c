@@ -26,6 +26,8 @@ void render_frame(render_state_t *state){
 
     size_t rect_max = state->plane->rect_max;
     size_t i;
+    box(state->canvas, 0, 0);
+    wrefresh(state->canvas);
     for (i = 0; i < rect_max; i++) {
         rectangle_t *rect = state->plane->rects[i];
         if (!rect) continue;

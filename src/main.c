@@ -13,6 +13,12 @@ int main(){
     plane_t *plane = plane_create(state->canv_maxx, state->canv_maxy);
     plane_init(plane, NULL, 8);
 
+    int i;
+    for (i = 0; i < 8; i++) {
+        plane->rects[i]->xspeed = 3;
+        plane->rects[i]->yspeed = 3;
+    }
+
     render_load(state, plane);
     
     while (true) {

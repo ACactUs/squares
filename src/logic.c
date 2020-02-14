@@ -8,6 +8,7 @@ rectangle_t *rectangle_create() {
 }
 
 void rectangle_destroy(rectangle_t *rect) {
+    if (rect->name) free(rect->name);
     free(rect);
 }
 
@@ -40,7 +41,6 @@ void rectangle_collision_fight(plane_t *plane, size_t left, size_t right) {
     if (!winner) {
         if (!(rand() % 10)) 
             return;
-
         if (rand() % 2) {
             rectangle_resize_x(lrect, 0.9f);
             rectangle_resize_y(rrect, 0.9f);
@@ -53,9 +53,9 @@ void rectangle_collision_fight(plane_t *plane, size_t left, size_t right) {
     //TODO
     /* some genetic logic may be defined here
      * for now just kill smaller one */
-    rectangle_t *looser = (winner == lrect) ? rrect : lrect;
+    size_t looser = (winner == lrect) ? right : left;
 
-    rectangle_destroy(looser);
+    plane_remove_rectangle(plane, looser);
 
     return;
 }
@@ -152,9 +152,7 @@ void action_pray(plane_t *plane, size_t index) {
 }
 
 void rectangle_TESTMOVE     (plane_t *plane, size_t index) { 
-    rectangle_t *rect = plane->rects[index];
-    rect->xspeed = 2;
-    rect->yspeed = 2;
+    /* DO NOTHING */
     return;
 }
 
@@ -222,19 +220,50 @@ void rectangle_act(plane_t *plane, size_t index) {
 
 int rectangle_borders_resolve(plane_t *plane, size_t index) {
     //FIXME MOVE CODE
+    rectangle_t *r = plane->rects[index];
+    /* up */
+    if (r->y < 0 ) {
+        double overflow = r->y - 0; 
+        r->y -= 2*overflow;
+        r->yspeed = -r->yspeed;
+        return 1;
+    } 
+    /* bot */
+    else if (r->y + r->height > plane->ysize) {
+        double overflow = r->y + r->height - plane->ysize;
+        r->y -= 2*overflow;
+        r->yspeed = -r->yspeed;
+        return 1;
+    }
+    /* left */
+    if (r->x < 0) {
+        double overflow = r->x - 0;
+        r->x -= 2*overflow;
+        r->xspeed = -r->xspeed;
+        return 1;
+    }
+    /* right */
+    else if (r->x + r->width > plane->xsize) { 
+        double overflow = r->x + r->width - plane->xsize;
+        r->x -= 2*overflow;
+        r->xspeed = -r->xspeed;
+        return 1;
+    }
+    return 0;
 }
 
 void rectangle_collision_resolve(plane_t *plane, size_t index) {
+    if (!plane->rects[index]) return; /* rectangle was killed, exit recursion */
     int flag_collided;
     size_t col_index = plane_check_collisions(plane, index, &flag_collided);
     if (!flag_collided) { /* if no rect collision check borders */
         if(rectangle_borders_resolve(plane, index)) /* if changed go deeper */
             rectangle_collision_resolve(plane, index);
-        return; /* no rect collision and no border collision exit recursion */
+        return; /* no rect collision and no border collision exit recursion 
+                 * or terminate exiting recursion */
     }
 
     /* rect collision happened, resolve by tunneling distance then go deeper */
-    
     /* go deeper */
     //FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME 
     rectangle_t *r = plane->rects[index];
@@ -244,21 +273,33 @@ void rectangle_collision_resolve(plane_t *plane, size_t index) {
     if (r->y > t->y && r->y < t->y + t->height) {
         double overshoot = r->y - t->y - t->height; //<0 checked
         r->y -= 2*overshoot;
+        r->yspeed = -r->yspeed;
+        t->yspeed = -t->yspeed;
+        rectangle_collision_fight(plane, index, col_index);
     } 
     //DOWN
     else if (r->y + r->height > t->y && r->y + r->height < t->y + t->height) {
         double overshoot = r->y + r->height - t->y; //>0 checked
         r->y -= 2*overshoot;
+        r->yspeed = -r->yspeed;
+        t->yspeed = -t->yspeed;
+        rectangle_collision_fight(plane, index, col_index);
     }     
     //LEFT
     else if (r->x > t->x && r->x < t->x + t->width) {
         double overshoot = r->x - t->y - t->width; //<0 checked
         r->x -= 2*overshoot;
+        r->xspeed = -r->xspeed;
+        t->xspeed = -t->xspeed;
+        rectangle_collision_fight(plane, index, col_index);
     }
     //RIGHT
     else if (r->x + r->width > t->x && r->x + r->width < t->x + t->width) {
         double overshoot = r->x + r->width - t->width; //>0 checked
         r->x -= 2*overshoot;
+        r->xspeed = -r->xspeed;
+        t->xspeed = -t->xspeed;
+        rectangle_collision_fight(plane, index, col_index);
     }
 
     rectangle_collision_resolve(plane, index);
@@ -267,8 +308,8 @@ void rectangle_collision_resolve(plane_t *plane, size_t index) {
 void rectangle_simulate(plane_t *plane, size_t index) {
     rectangle_t *rect = plane->rects[index];
     double nx, ny;
-    nx = rect->x + (rect->xspeed) * ((long double)TICK_NSEC/(long double)1000000000LL);
-    ny = rect->y + (rect->yspeed) * ((long double)TICK_NSEC/(long double)1000000000LL);
+    nx = rect->x + (rect->xspeed) * (double)((long double)TICK_NSEC/(long double)1000000000LL);
+    ny = rect->y + (rect->yspeed) * (double)((long double)TICK_NSEC/(long double)1000000000LL);
     rect->x = nx;
     rect->y = ny;
 
@@ -277,40 +318,7 @@ void rectangle_simulate(plane_t *plane, size_t index) {
     /* continue checks untill resolved, 
      * if no changes were made during iteration, unset unresolved flag */
     //FIXME move code to borders_resolve
-    int unresolved = TRUE;
-    while (unresolved) {
-        /* TODO move to rectangle_borders_resolve */
-        /* top */
-        unresolved = FALSE;
-        if (rect->y < 0 ) {
-            rect->y = -rect->y;
-            unresolved = TRUE;
-        } 
-        /* bot */
-        else if (rect->y > plane->ysize) {
-            double overflow = rect->y - plane->ysize;
-            rect->y = -overflow;
-            unresolved = TRUE;
-        }
-        /* left */
-        if (rect->x < 0) {
-            rect->x = -rect->x;
-            unresolved = TRUE;
-        }
-        /* right */
-        else if (rect->x + rect->width > plane->xsize) { 
-            double overflow = rect->x - plane->xsize;
-            rect->x = -overflow;
-            unresolved = TRUE;
-        }
-        /* END BORDERS */    
-        /* FIXME this must be handles by rectangle_collision_resolve 
-        int flag_collided = false;
-        size_t collided_with = plane_check_collisions(plane, index, &flag_collided);
-        if (flag_collided) rectangle_collision_resolve(plane, index, collided_with);
-        */
-        rectangle_collision_resolve(plane, index);
-    }
+    rectangle_collision_resolve(plane, index);
 }
 
 rectangle_t *rectangle_compare(rectangle_t *left, rectangle_t *right) { 
@@ -399,22 +407,28 @@ size_t plane_check_collisions(plane_t *plane, size_t index, int *flag_collided) 
         }
     }
     *flag_collided = false;
-    return NULL;
+    return 0;
 }
 
 /*WARN function asumes that left and right exist and were initialized correctly*/
 int rectangle_check_collision(rectangle_t *left, rectangle_t *right) {
     if (right->x > left->x && right->x < left->x + left->width){
-        if (right->y > left->y && right->y < left->y + left->width)
+        if (right->y > left->y && right->y < left->y + left->height)
             return 1;
-        if (right->y + right->width > left->y && right->y + right->width < left->y + left->width)
+        if (right->y + right->height > left->y && right->y + right->height < left->y + left->height)
             return 1;
     }
     if (right->x + right->width > left->x && right->x + right->width < left->x + left->width) {
-        if(right->y > left->y && right->y < left->y + left->width)
+        if(right->y > left->y && right->y < left->y + left->height)
             return 1;
-        if(right->y + right->width > left->y && right->y + right->width < left->y + left->width)
+        if(right->y + right->height > left->y && right->y + right->height < left->y + left->height)
             return 1;
     }
     return 0;
+}
+
+/* properly removes rectangle and destroys it */
+void plane_remove_rectangle(plane_t *plane, size_t index) {
+    free(plane->rects[index]);
+    plane->rects[index] = NULL;
 }
