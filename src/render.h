@@ -29,7 +29,7 @@ render_state_t *render_init(); /*done*/
 void render_exit(render_state_t *state); /*done*/
 
 void render_load(render_state_t *state, plane_t *plane); /*done*/
-void render_unload(render_state_t *state, plane_t *plane); /*done*/
+void render_unload(render_state_t *state); /*done*/
 
 void render_greeting(render_state_t *state); /*done*/
 

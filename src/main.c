@@ -13,6 +13,7 @@ int main(){
     plane_t *plane = plane_create(state->canv_maxx, state->canv_maxy);
     plane_init(plane, NULL, 8);
 
+    /* for test only */
     int i;
     for (i = 0; i < 8; i++) {
         plane->rects[i]->xspeed = 3;
@@ -26,5 +27,8 @@ int main(){
         render_frame(state);
     }
 
+    /* TODO write user interface and exit/reload plane on wgetch 
+    render_exit(state);
+    */
     return 0;
 }

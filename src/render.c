@@ -108,10 +108,10 @@ void render_load(render_state_t *state, plane_t *plane) {
     }
 }
 
-void render_unload(render_state_t *state, plane_t *plane) {
+void render_unload(render_state_t *state) {
     /* close every non-NULL window*/
     size_t i;
-    size_t wins = plane->rect_max;
+    size_t wins = state->plane->rect_max;
     for (i = 0; i < wins; i++) {
         WINDOW *win = state->rect_wins[i];
         if (!win) continue;
@@ -165,6 +165,8 @@ void render_clear_status(render_state_t *state) {
 }
 
 void render_exit(render_state_t *state) {
+    plane_destroy(state->plane);
+    render_unload(state);
     free(state);
     endwin();
 }

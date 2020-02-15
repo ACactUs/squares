@@ -28,9 +28,9 @@ typedef int* olist_t ;
 enum no_stim    { so_idle, so_random, so_lrandom, SE_NUMBER };
 enum food       { fo_idle, fo_random, fo_lrandom, fo_avoid, fo_seek, FE_NUMBER };
 enum big        { bo_idle, bo_random, bo_lrandom, bo_avoid, bo_seek, BE_NUMBER };
-enum pray       { po_idle, po_random, po_lrandom, po_avoid, po_seek, PE_NUMBER };
+enum prey       { po_idle, po_random, po_lrandom, po_avoid, po_seek, PE_NUMBER };
 
-enum actions    { a_no_stim, a_food, a_big, a_pray }; 
+enum actions    { a_no_stim, a_food, a_big, a_prey }; 
 
 /* traits index kept in enum are used to access items in traits array */
 enum traits     { ti_mspeed=0, ti_avoid_dist, ti_avoid_speed, t_pursue_speed, t_food_speed, TIE_NUMBER };
@@ -40,7 +40,7 @@ typedef struct {
     enum no_stim  nostim_o;
     enum food     food_o;
     enum big      big_o;
-    enum pray     pray_o;
+    enum prey     prey_o;
 } actions_opt_t;
 
 typedef struct {
@@ -115,7 +115,7 @@ void frame_simulate(plane_t *plane); /*ticks chosen*/
 void action_nostim  (plane_t *plane, size_t index); /*partially*/
 void action_food    (plane_t *plane, size_t index); /*partially*/
 void action_big     (plane_t *plane, size_t index); /*partially*/
-void action_pray    (plane_t *plane, size_t index); /*partially*/
+void action_prey    (plane_t *plane, size_t index); /*partially*/
 
 void rectangle_hybernate    (plane_t *plane, size_t index); 
 void rectangle_move_random  (plane_t *plane, size_t index); 

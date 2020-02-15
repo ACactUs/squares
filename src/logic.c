@@ -127,7 +127,7 @@ void action_big(plane_t *plane, size_t index) {
     }
 }
 
-void action_pray(plane_t *plane, size_t index) {
+void action_prey(plane_t *plane, size_t index) {
     rectangle_t *rect = plane->rects[index];
     if (!rect) return;
     switch (rect->actions.food_o) {
@@ -211,8 +211,8 @@ void rectangle_act(plane_t *plane, size_t index) {
         case a_big:
             action_big(plane, index);
             break;
-        case a_pray:
-            action_pray(plane, index);
+        case a_prey:
+            action_prey(plane, index);
             break;
     }
     rectangle_simulate(plane, index);
@@ -383,7 +383,7 @@ void plane_destroy(plane_t *plane) {
     rectangle_t **rects = plane->rects;
     for(i = 0; i < max; i++) {
         if (!rects[i]) continue;
-        free(rects[i]);
+        rectangle_destroy(rects[i]);
     }
     free(rects);
     free(plane);
