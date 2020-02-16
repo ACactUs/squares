@@ -77,8 +77,6 @@ rectangle_t *rectangle_create(); /*done*/
 
 rectangle_t *rectangle_copy(rectangle_t *rect); /*done*/
 
-
-
 void rectangle_destroy(rectangle_t *rect); /*done*/
 
 int rectangle_check_collision(rectangle_t *left, rectangle_t *right); /*done*/
@@ -136,6 +134,9 @@ void rectangle_act(plane_t *plane, size_t index);
  * breaks if index, plane or rectangle is invalid*/
 void rectangle_simulate(plane_t *plane, size_t index);
 
+/* returns distance between two rectangles' *centers* */
+double rectangle_distance(rectangle_t *left, rectangle_t *right);
+
 plane_t *plane_create(double xsize, double ysize); /*done*/
 
 /* if rects is NULL, plane will be initialized with random rects */
@@ -146,8 +147,11 @@ void plane_destroy(plane_t *plane); /*done*/
 
 void plane_remove_rectangle(plane_t *plane, size_t index);
 
-/*returns first collision rectangle index, sets flag true if collision happened*/
+/* returns first collision rectangle index, sets flag true if collision happened*/
 size_t plane_check_collisions(plane_t *plane, size_t index, int *flag_collided); 
+
+/* returns index of first rectanle which matches threshold */
+size_t plane_get_proximate_rectangle(plane_t *plane, size_t index, double threshold);
 
 /* should be called on collision, manages rectagles fight only */
 void rectangle_collision_fight(plane_t *plane, size_t left, size_t right); /*done*/

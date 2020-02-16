@@ -162,9 +162,7 @@ void rectangle_move_lrandom (plane_t *plane, size_t index) { rectangle_TESTMOVE(
 void rectangle_move_avoid   (plane_t *plane, size_t index) { rectangle_TESTMOVE(plane, index); }
 void rectangle_move_seek    (plane_t *plane, size_t index) { rectangle_TESTMOVE(plane, index); }
 
-
 void frame_simulate(plane_t *plane) {
-    //TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     long long nsec_elapsed = (ts.tv_sec - plane->ts_curr.tv_sec) * 1000000000LL
@@ -199,7 +197,6 @@ enum actions rectangle_action_get(plane_t *plane, size_t index) {
 }
 
 void rectangle_act(plane_t *plane, size_t index) {
-    //TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO 
     enum actions action = rectangle_action_get(plane, index);
     switch (action) {
         case a_no_stim:
@@ -268,35 +265,100 @@ void rectangle_collision_resolve(plane_t *plane, size_t index) {
     //FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME 
     rectangle_t *r = plane->rects[index];
     rectangle_t *t = plane->rects[col_index];
+    /* i[udlrvh] flags indicate if intersection from [udlrvh] side is possible
+     * udlr - up, down, left, right; strictly
+     * vh   - vertically, horizontally */
+    int iu, id, il, ir, iv, ih;
+    /* WARN these variables duplicate in rectangle_check_collision 
+     * TODO rectangle_check_collision should return enum of collision direction
+     * to remove duplicate code. This function should use provided enums 
+     * instead of making checks itself*/
+    iu = r->y > t->y && r->y < t->y + t->height;
+    id = r->y + r->height > t->y && r->y + r->height < t->y + t->height;
+    il = r->x > t->x && r->x < t->x + t->width;
+    ir = r->x + r->width > t->x && r->x + r->width < t->x + t->width;
+
+    iv = (id) || (r->y < t->y && r->y + r->height > t->y + t->height) || (iu);
+    ih = (il) || (r->x < t->x && r->x + r->width > t->x + t->width)   || (ir);
+
     /* else if are chained to prevent double bounceback on angle collision */
-    //UP
-    if (r->y > t->y && r->y < t->y + t->height) {
-        double overshoot = r->y - t->y - t->height; //<0 checked
-        r->y -= 2*overshoot;
+    /* UP */
+    if (iu && ih) {
+        /* if collision from side happend correct that side overshoot too*/
+        if (il) { 
+            double xovershoot = r->x - t->y - t->width; //<0 checked
+            r->x -= 2*xovershoot;
+            r->xspeed = -r->xspeed;
+            t->xspeed = -t->xspeed;
+        } else 
+        if (ir) {
+            double xovershoot = r->x + r->width - t->width; //>0 checked
+            r->x -= 2*xovershoot;
+            r->xspeed = -r->xspeed;
+            t->xspeed = -t->xspeed;
+        }
+        double yovershoot = r->y - t->y - t->height; //<0 checked
+        r->y -= 2*yovershoot;
         r->yspeed = -r->yspeed;
         t->yspeed = -t->yspeed;
         rectangle_collision_fight(plane, index, col_index);
     } 
-    //DOWN
-    else if (r->y + r->height > t->y && r->y + r->height < t->y + t->height) {
-        double overshoot = r->y + r->height - t->y; //>0 checked
-        r->y -= 2*overshoot;
+    /* DOWN */
+    else if (id && ih) {
+        if (il) { 
+            double xovershoot = r->x - t->y - t->width; //<0 checked
+            r->x -= 2*xovershoot;
+            r->xspeed = -r->xspeed;
+            t->xspeed = -t->xspeed;
+        } else 
+        if (ir) {
+            double xovershoot = r->x + r->width - t->width; //>0 checked
+            r->x -= 2*xovershoot;
+            r->xspeed = -r->xspeed;
+            t->xspeed = -t->xspeed;
+        }
+        double yovershoot = r->y + r->height - t->y; //>0 checked
+        r->y -= 2*yovershoot;
         r->yspeed = -r->yspeed;
         t->yspeed = -t->yspeed;
         rectangle_collision_fight(plane, index, col_index);
     }     
-    //LEFT
-    else if (r->x > t->x && r->x < t->x + t->width) {
-        double overshoot = r->x - t->y - t->width; //<0 checked
-        r->x -= 2*overshoot;
+    /* LEFT */
+    else if (il && iv) {
+        if (iu) {
+            double yovershoot = r->y - t->y - t->height; //<0 checked
+            r->y -= 2*yovershoot;
+            r->yspeed = -r->yspeed;
+            t->yspeed = -t->yspeed;
+        } else
+        if (id) {
+            double yovershoot = r->y + r->height - t->y; //>0 checked
+            r->y -= 2*yovershoot;
+            r->yspeed = -r->yspeed;
+            t->yspeed = -t->yspeed;
+        }
+        double xovershoot = r->x - t->y - t->width; //<0 checked
+        r->x -= 2*xovershoot;
         r->xspeed = -r->xspeed;
         t->xspeed = -t->xspeed;
         rectangle_collision_fight(plane, index, col_index);
     }
-    //RIGHT
-    else if (r->x + r->width > t->x && r->x + r->width < t->x + t->width) {
-        double overshoot = r->x + r->width - t->width; //>0 checked
-        r->x -= 2*overshoot;
+    /* RIGHT */
+    else if (ir && iv) {
+        if (iu) {
+            double yovershoot = r->y - t->y - t->height; //<0 checked
+            r->y -= 2*yovershoot;
+            r->yspeed = -r->yspeed;
+            t->yspeed = -t->yspeed;
+        } else
+        if (id) {
+            double yovershoot = r->y + r->height - t->y; //>0 checked
+            r->y -= 2*yovershoot;
+            r->yspeed = -r->yspeed;
+            t->yspeed = -t->yspeed;
+        }
+        double xovershoot = r->x + r->width - t->width; //>0 checked
+        r->x -= 2*xovershoot;
         r->xspeed = -r->xspeed;
         t->xspeed = -t->xspeed;
         rectangle_collision_fight(plane, index, col_index);
@@ -411,7 +473,20 @@ size_t plane_check_collisions(plane_t *plane, size_t index, int *flag_collided) 
 }
 
 /*WARN function asumes that left and right exist and were initialized correctly*/
-int rectangle_check_collision(rectangle_t *left, rectangle_t *right) {
+int rectangle_check_collision(rectangle_t *l, rectangle_t *r) {
+    /*TODO return enum of collision direction instead*/
+    int iu, id, il, ir, iv, ih;
+    iu = l->y > r->y && l->y < r->y + r->height;
+    id = l->y + l->height > r->y && l->y + l->height < r->y + r->height;
+    il = l->x > r->x && l->x < r->x + r->width;
+    ir = l->x + l->width > r->x && l->x + l->width < r->x + r->width;
+
+    iv = (id) || (l->y < r->y && l->y + l->height > r->y + r->height) || (iu);
+    ih = (il) || (l->x < r->x && l->x + l->width > r->x + r->width)   || (ir);
+
+    return (iv && ih);
+
+    /*
     if (right->x > left->x && right->x < left->x + left->width){
         if (right->y > left->y && right->y < left->y + left->height)
             return 1;
@@ -425,10 +500,37 @@ int rectangle_check_collision(rectangle_t *left, rectangle_t *right) {
             return 1;
     }
     return 0;
+    */
 }
 
 /* properly removes rectangle and destroys it */
 void plane_remove_rectangle(plane_t *plane, size_t index) {
     free(plane->rects[index]);
     plane->rects[index] = NULL;
+}
+
+size_t plane_get_proximate_rectangle(plane_t *plane, size_t index, double threshold) {
+    size_t i, max;
+    rectangle_t *rect = plane->rects[index];
+    max = plane->rect_max;
+    for (i = 0; i < max; i++) {
+        rectangle_t *curr = plane->rects[i];
+        if (!curr) continue;
+        double dist = rectangle_distance(rect, curr);
+        if (dist <= threshold) return i;
+    }
+}
+
+double rectangle_distance(rectangle_t *left, rectangle_t *right) {
+    double lcx, lcy, rcx, rcy, dcx, dcy;
+    lcx = (left->x  + left->width)  / 2;
+    lcy = (left->y  + left->height) / 2;
+
+    rcx = (right->x + right->width) / 2;
+    rcy = (right->y + right->height)/ 2;
+    
+    dcx = (lcx - rcx);
+    dcy = (lcy - rcy);
+
+    return sqrt(dcx*dcx + dcy*dcy);
 }
