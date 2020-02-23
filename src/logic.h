@@ -5,7 +5,7 @@
 #include <time.h>
 
 /*CONFIG*/
-#define SIZE_DIFF_TRESHOLD          1.2f
+#define SIZE_DIFF_TRESHOLD          1.2f        /* rect must be ... times bigger in order to eat another rect*/
 #define WIDTH_INIT_MIN              4
 #define WIDTH_INIT_MAX              10
 #define HEIGHT_INIT_MIN             4
@@ -15,6 +15,19 @@
 #define RECTANGLE_INIT_MAX_RETRIES  10
 #define TICK_NSEC                   5000000LL   /* 500ticks/sec */
 #define BOUNCE_SPEED_FINE           0.4         /* spd = spd - spd*fine*/
+/*INITS*/
+#define RANDOM_NO_STIM  (rand() % SE_NUMBER)
+#define RANDOM_FOOD     (rand() % FE_NUMBER)
+#define RANDOM_BIG      (rand() % BE_NUMBER)
+#define RANDOM_PREY     (rand() % PE_NUMBER)
+/*DEFAULT TRAITS*/
+#define DEFAULT_MSPEED       3 
+#define DEFAULT_AVOID_DIST   10     
+#define DEFAULT_AVOID_SPEED  4      
+#define DEFAULT_PURSUE_DIST  10      
+#define DEFAULT_PURSUE_SPEED 4.5      
+#define DEFAULT_FOOD_DIST    5    
+#define DEFAULT_FOOD_SPEED   4     
 /*END CONFIG*/
 
 /* IMPORTANT NOTICE
@@ -23,8 +36,11 @@
 #define MAX(a,b) ((a) > (b) ? a : b)
 #define MIN(a,b) ((a) < (b) ? a : b)
 
-typedef int* olist_t ;
+/* another rect is same size, bigger or smaller than rect */
+enum size_diff_e {sd_same, sd_prey, sd_hunter};
 
+/* these enums determine what rectangle do when
+action is chosen| do one of these actions instead*/
 enum no_stim    { so_idle, so_random, so_lrandom, SE_NUMBER };
 enum food       { fo_idle, fo_random, fo_lrandom, fo_avoid, fo_seek, FE_NUMBER };
 enum big        { bo_idle, bo_random, bo_lrandom, bo_avoid, bo_seek, BE_NUMBER };
@@ -33,7 +49,7 @@ enum prey       { po_idle, po_random, po_lrandom, po_avoid, po_seek, PE_NUMBER }
 enum actions    { a_no_stim, a_food, a_big, a_prey }; 
 
 /* traits index kept in enum are used to access items in traits array */
-enum traits     { ti_mspeed=0, ti_avoid_dist, ti_avoid_speed, t_pursue_speed, t_food_speed, TIE_NUMBER };
+enum traits     { ti_mspeed=0, ti_avoid_dist, ti_avoid_speed, ti_pursue_dist, ti_pursue_speed, ti_food_dist, ti_food_speed, TIE_NUMBER };
 
 /* this type represents selected action's enum number */
 typedef struct {
@@ -43,11 +59,6 @@ typedef struct {
     enum prey     prey_o;
 } actions_opt_t;
 
-typedef struct {
-    int *traits;
-    int size;
-} traits_opt_t;
-
 int mutate(int eo_target, int e_number, float rate); 
 
 typedef enum {
@@ -56,24 +67,31 @@ typedef enum {
     SQ_NBLUE
 } SQ_COLORS;
 
-typedef struct {
+typedef struct rectanlge {
+    char *name;                 //FIXME memory
+    SQ_COLORS color;
+    size_t frags;
+    
     double y, x;
     double height, width;
     double yspeed, xspeed;
-    char *name;
-    SQ_COLORS color;
-    size_t frags;
     double energy;
     double energy_stored;
+
     size_t ticks_idle;          /* number of ticks w/o stimuli */
     struct timespec timer;      /* timespec of an event */
     int move_time;              /* ??? */
+
     actions_opt_t actions;
-    traits_opt_t traits;
+    double traits[TIE_NUMBER];  /* array of traits, max index=TIE_NUMBER*/
+    struct rectangle *lock;     /* pointer to rectangle which rect is locked to*/
 } rectangle_t;
 
 
 rectangle_t *rectangle_create(); /*done*/
+
+/* sets all traits to defaults*/
+void rectangle_default_traits(rectangle_t *rect);
 
 rectangle_t *rectangle_copy(rectangle_t *rect); /*done*/
 
@@ -151,7 +169,7 @@ void plane_remove_rectangle(plane_t *plane, size_t index);
 size_t plane_check_collisions(plane_t *plane, size_t index, int *flag_collided); 
 
 /* returns index of first rectanle which matches threshold */
-size_t plane_get_proximate_rectangle(plane_t *plane, size_t index, double threshold);
+size_t plane_get_proximate_rectangle(plane_t *plane, size_t index, double mindist, enum size_diff_e type, int *flagExists);
 
 /* should be called on collision, manages rectagles fight only */
 void rectangle_collision_fight(plane_t *plane, size_t left, size_t right); /*done*/

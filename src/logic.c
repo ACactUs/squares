@@ -2,8 +2,25 @@
 #include <curses.h>
 #include <math.h>
 
+void rectangle_default_traits(rectangle_t *rect){
+    rect->traits[ti_mspeed      ] = DEFAULT_MSPEED;
+    rect->traits[ti_avoid_dist  ] = DEFAULT_AVOID_DIST;
+    rect->traits[ti_avoid_speed ] = DEFAULT_AVOID_SPEED;
+    rect->traits[ti_pursue_dist ] = DEFAULT_PURSUE_DIST;
+    rect->traits[ti_pursue_speed] = DEFAULT_PURSUE_SPEED;
+    rect->traits[ti_food_dist   ] = DEFAULT_FOOD_DIST;
+    rect->traits[ti_food_speed  ] = DEFAULT_FOOD_SPEED;
+}
+
 rectangle_t *rectangle_create() {
-    rectangle_t *rect; rect = (rectangle_t*)calloc(1, sizeof(rectangle_t));
+    rectangle_t *rect = (rectangle_t*)calloc(1, sizeof(rectangle_t));
+
+    rect->actions.nostim_o  = RANDOM_NO_STIM; 
+    rect->actions.big_o     = RANDOM_BIG; 
+    rect->actions.food_o    = RANDOM_FOOD; 
+    rect->actions.prey_o    = RANDOM_PREY; 
+    
+    rectangle_default_traits(rect);
     return rect;
 }
 
@@ -192,7 +209,16 @@ void frame_simulate(plane_t *plane) {
 
 
 enum actions rectangle_action_get(plane_t *plane, size_t index) {
-    //FIXME, only one branch defined yet
+    rectangle_t *rect = plane->rects[index];
+    int bigger_exists = false,
+        target_exists = false;
+    plane_get_proximate_rectangle(plane, index, rect->traits[ti_avoid_dist], sd_hunter, &bigger_exists);
+    plane_get_proximate_rectangle(plane, index, rect->traits[ti_pursue_speed], sd_prey, &target_exists);
+    //TODO actions order trait
+    if (bigger_exists) return a_big;
+    if (target_exists) return a_prey;
+    //TODO food
+    
     return a_no_stim;
 }
 
@@ -508,8 +534,7 @@ void plane_remove_rectangle(plane_t *plane, size_t index) {
     free(plane->rects[index]);
     plane->rects[index] = NULL;
 }
-
-size_t plane_get_proximate_rectangle(plane_t *plane, size_t index, double threshold) {
+size_t plane_get_proximate_rectangle(plane_t *plane, size_t index, double mindist, enum size_diff_e type, int *flagExists) {
     size_t i, max;
     rectangle_t *rect = plane->rects[index];
     max = plane->rect_max;
@@ -517,8 +542,25 @@ size_t plane_get_proximate_rectangle(plane_t *plane, size_t index, double thresh
         rectangle_t *curr = plane->rects[i];
         if (!curr) continue;
         double dist = rectangle_distance(rect, curr);
-        if (dist <= threshold) return i;
+        if (dist <= mindist) {
+            if (curr == rect) continue;
+            double cs = rectangle_size(curr),
+                   rs = rectangle_size(rect);
+            /*curr is prey*/
+            if (rs / cs > SIZE_DIFF_TRESHOLD) {
+                /*check if it is what we need*/
+                if (type != sd_prey) continue;
+            }
+            /*curr is hunter*/
+            if (cs / rs > SIZE_DIFF_TRESHOLD) {
+                if (type != sd_hunter) continue;
+            }
+            *flagExists = true;
+            return i;
+        };
     }
+    *flagExists = false;
+    return 0;
 }
 
 double rectangle_distance(rectangle_t *left, rectangle_t *right) {
@@ -534,3 +576,4 @@ double rectangle_distance(rectangle_t *left, rectangle_t *right) {
 
     return sqrt(dcx*dcx + dcy*dcy);
 }
+
