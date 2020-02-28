@@ -1,15 +1,16 @@
 #include "logic.h"
-#include <curses.h>
 #include <math.h>
 
 void rectangle_default_traits(rectangle_t *rect){
-    rect->traits[ti_mspeed      ] = DEFAULT_MSPEED;
-    rect->traits[ti_avoid_dist  ] = DEFAULT_AVOID_DIST;
-    rect->traits[ti_avoid_speed ] = DEFAULT_AVOID_SPEED;
-    rect->traits[ti_pursue_dist ] = DEFAULT_PURSUE_DIST;
-    rect->traits[ti_pursue_speed] = DEFAULT_PURSUE_SPEED;
-    rect->traits[ti_food_dist   ] = DEFAULT_FOOD_DIST;
-    rect->traits[ti_food_speed  ] = DEFAULT_FOOD_SPEED;
+    rect->traits[ti_mspeed          ] = DEFAULT_MSPEED;
+    rect->traits[ti_accel           ] = DEFAULT_ACCEL;
+    rect->traits[ti_mrandom_delay   ] = DEFAULT_MRANDOM_DELAY;
+    rect->traits[ti_avoid_dist      ] = DEFAULT_AVOID_DIST;
+    rect->traits[ti_avoid_speed     ] = DEFAULT_AVOID_SPEED;
+    rect->traits[ti_pursue_dist     ] = DEFAULT_PURSUE_DIST;
+    rect->traits[ti_pursue_speed    ] = DEFAULT_PURSUE_SPEED;
+    rect->traits[ti_food_dist       ] = DEFAULT_FOOD_DIST;
+    rect->traits[ti_food_speed      ] = DEFAULT_FOOD_SPEED;
 }
 
 rectangle_t *rectangle_create() {
@@ -90,11 +91,10 @@ void action_nostim(plane_t *plane, size_t index) {
         case so_lrandom:
             rectangle_move_lrandom(plane, index);
             break;
-        case SE_NUMBER:
+        default:
             exit(1);
     }
 }
-
 
 void action_food(plane_t *plane, size_t index) {
     rectangle_t *rect = plane->rects[index];
@@ -115,7 +115,7 @@ void action_food(plane_t *plane, size_t index) {
         case fo_seek:
             rectangle_move_seek(plane, index);
             break;
-        case FE_NUMBER:
+        default:
             exit(1);
     }
 }
@@ -139,7 +139,7 @@ void action_big(plane_t *plane, size_t index) {
         case bo_seek:
             rectangle_move_seek(plane, index);
             break;
-        case BE_NUMBER:
+        default:
             exit(1);
     }
 }
@@ -163,26 +163,118 @@ void action_prey(plane_t *plane, size_t index) {
         case po_seek:
             rectangle_move_seek(plane, index);
             break;
-        case PE_NUMBER:
+        default:
             exit (1);
     }
 }
 
+
+void rectangle_accelerate(rectangle_t *rect, double speed, double angle) {
+    double time_needed = speed / rect->traits[ti_accel]; /* time in seconds to accelerate */
+
+
+    //TODO handle negative angles
+    while (angle > 2*M_PI) angle -= M_PI;
+    double x=0, y=0;
+    int dl  = angle >= 0        && angle <= M_PI/2,
+        ul  = angle > M_PI/2    && angle <= M_PI,
+        ur  = angle > M_PI      && angle <= M_PI*1.5,
+        dr  = angle > M_PI*1.5  && angle <= M_PI*2;
+    /* calculate speed projections on x and y axis */
+    if (dl) {
+        x = -speed * sin(angle);
+        y =  speed * cos(angle);
+    } else
+    if (ul) {
+        angle -= M_PI/2;
+        x = -speed * cos(angle);
+        y = -speed * sin(angle);
+    } else
+    if (ur) {
+        angle -= M_PI;
+        x =  speed * sin(angle);
+        y = -speed * cos(angle);
+    } else
+    if (dr) {
+        angle -= M_PI*1.5;
+        x = speed * sin(angle);
+        y = speed * cos(angle);
+    } else exit(1);
+    
+    double dx = (x * TICK_NSEC) / NSEC_IN_SEC;
+    double dy = (y * TICK_NSEC) / NSEC_IN_SEC;
+
+    /* check if speed projection sigh and check if acceleration will be completed at this iteration */
+    if (x >= 0) rect->xspeed = (rect->xspeed + dx >= x) ? x : rect->xspeed + x;
+        else    rect->xspeed = (rect->xspeed + dx <= x) ? x : rect->xspeed + x;
+    if (y >= 0) rect->yspeed = (rect->yspeed + dy >= y) ? y : rect->yspeed + y;
+        else    rect->yspeed = (rect->yspeed + dy <= y) ? y : rect->yspeed + y;
+    //FIXME no energy losses
+}
+
 void rectangle_TESTMOVE     (plane_t *plane, size_t index) { 
-    /* DO NOTHING */
+    //FIXME redirecting to move_random
+    rectangle_move_random(plane, index);
     return;
 }
 
 void rectangle_hybernate    (plane_t *plane, size_t index) { rectangle_TESTMOVE(plane, index); }
-void rectangle_move_random  (plane_t *plane, size_t index) { rectangle_TESTMOVE(plane, index); }
+
+void rectangle_move_random  (plane_t *plane, size_t index) { 
+    rectangle_t *rect = plane->rects[index];
+    //FIXME random angle
+    double angle = M_PI * 1 + M_PI / 4;
+    rectangle_accelerate(rect, 5, angle);
+}
+
 void rectangle_move_lrandom (plane_t *plane, size_t index) { rectangle_TESTMOVE(plane, index); }
 void rectangle_move_avoid   (plane_t *plane, size_t index) { rectangle_TESTMOVE(plane, index); }
 void rectangle_move_seek    (plane_t *plane, size_t index) { rectangle_TESTMOVE(plane, index); }
 
-void frame_simulate(plane_t *plane) {
+void timer_wait(struct timespec *start, long long nsecs) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
-    long long nsec_elapsed = (ts.tv_sec - plane->ts_curr.tv_sec) * 1000000000LL
+    long long nsec_elapsed = (ts.tv_sec - start->tv_sec) * NSEC_IN_SEC
+                                    + ts.tv_nsec - start->tv_nsec;
+
+    if (nsec_elapsed < nsecs) {
+        //clock_gettime(CLOCK_MONOTONIC, &start);
+        long long wait_nsec = nsecs - nsec_elapsed;
+        ts.tv_sec  = 0;
+        while (wait_nsec >= NSEC_IN_SEC) {
+            ts.tv_sec++;
+            wait_nsec -= NSEC_IN_SEC;
+        }
+        ts.tv_nsec = wait_nsec;
+        nanosleep(&ts, NULL);
+    }
+}
+
+void timer_reset(struct timespec *start) {
+    clock_gettime(CLOCK_MONOTONIC, start);
+}
+
+void timer_waitreset(struct timespec *start, long long nsecs) {
+    timer_wait(start, nsecs);
+    timer_reset(start);
+}
+
+int timer_check(struct timespec *start, long long nsecs) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    long long nsec_elapsed = (ts.tv_sec - start->tv_sec) * NSEC_IN_SEC
+                                    + ts.tv_nsec - start->tv_nsec;
+
+
+    return (nsec_elapsed < nsecs);
+}
+
+void frame_simulate(plane_t *plane) {
+    //FIXME call timer_waitreset instead
+    /*
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    long long nsec_elapsed = (ts.tv_sec - plane->ts_curr.tv_sec) * NSEC_IN_SEC
                                     + ts.tv_nsec - plane->ts_curr.tv_nsec;
 
 
@@ -190,21 +282,22 @@ void frame_simulate(plane_t *plane) {
         //clock_gettime(CLOCK_MONOTONIC, &plane->ts_curr);
         long long wait_nsec = TICK_NSEC - nsec_elapsed;
         ts.tv_sec  = 0;
-        while (wait_nsec >= 1000000000LL) {
+        while (wait_nsec >= NSEC_IN_SEC) {
             ts.tv_sec++;
-            wait_nsec -= 1000000000LL;
+            wait_nsec -= NSEC_IN_SEC;
         }
         ts.tv_nsec = wait_nsec;
         nanosleep(&ts, NULL);
     }
-
+    */
+    timer_wait(&plane->ts_curr, TICK_NSEC);
     size_t max = plane->rect_max;
     size_t i;
     for (i = 0; i < max; i++) {
         if (!plane->rects[i]) continue;
         rectangle_act(plane, i);
     }
-    clock_gettime(CLOCK_MONOTONIC, &plane->ts_curr);
+    timer_reset(&plane->ts_curr);
 }
 
 
@@ -299,13 +392,13 @@ void rectangle_collision_resolve(plane_t *plane, size_t index) {
      * TODO rectangle_check_collision should return enum of collision direction
      * to remove duplicate code. This function should use provided enums 
      * instead of making checks itself*/
-    iu = r->y > t->y && r->y < t->y + t->height;
-    id = r->y + r->height > t->y && r->y + r->height < t->y + t->height;
-    il = r->x > t->x && r->x < t->x + t->width;
-    ir = r->x + r->width > t->x && r->x + r->width < t->x + t->width;
+    iu = r->y >= t->y && r->y <= t->y + t->height;
+    id = r->y + r->height >= t->y && r->y + r->height <= t->y + t->height;
+    il = r->x >= t->x && r->x <= t->x + t->width;
+    ir = r->x + r->width >= t->x && r->x + r->width <= t->x + t->width;
 
-    iv = (id) || (r->y < t->y && r->y + r->height > t->y + t->height) || (iu);
-    ih = (il) || (r->x < t->x && r->x + r->width > t->x + t->width)   || (ir);
+    iv = (id) || (r->y <= t->y && r->y + r->height >= t->y + t->height) || (iu);
+    ih = (il) || (r->x <= t->x && r->x + r->width >= t->x + t->width)   || (ir);
 
     /* else if are chained to prevent double bounceback on angle collision */
     /* UP */
@@ -390,14 +483,15 @@ void rectangle_collision_resolve(plane_t *plane, size_t index) {
         rectangle_collision_fight(plane, index, col_index);
     }
 
-    rectangle_collision_resolve(plane, index);
+    //rectangle_collision_resolve(plane, index);
+    return;
 }
 
 void rectangle_simulate(plane_t *plane, size_t index) {
     rectangle_t *rect = plane->rects[index];
     double nx, ny;
-    nx = rect->x + (rect->xspeed) * (double)((long double)TICK_NSEC/(long double)1000000000LL);
-    ny = rect->y + (rect->yspeed) * (double)((long double)TICK_NSEC/(long double)1000000000LL);
+    nx = rect->x + (rect->xspeed) * (double)((long double)TICK_NSEC/(long double)NSEC_IN_SEC);
+    ny = rect->y + (rect->yspeed) * (double)((long double)TICK_NSEC/(long double)NSEC_IN_SEC);
     rect->x = nx;
     rect->y = ny;
 
@@ -434,8 +528,8 @@ void _rectangle_init_randomly(plane_t *plane, rectangle_t *rect) {
 void  plane_init(plane_t *plane, rectangle_t **rects, size_t recs_size) {
     plane->rects = calloc(sizeof(rectangle_t*), recs_size);
     plane->rect_max = recs_size;
-    clock_gettime(CLOCK_MONOTONIC, &plane->ts_init);
-    clock_gettime(CLOCK_MONOTONIC, &plane->ts_curr);
+    timer_reset(&plane->ts_init);
+    timer_reset(&plane->ts_curr);
     if (!rects){
         /* no rects given, therefore create them accordingly to config globals
          * TODO kill intersecting ones*/
@@ -502,13 +596,13 @@ size_t plane_check_collisions(plane_t *plane, size_t index, int *flag_collided) 
 int rectangle_check_collision(rectangle_t *l, rectangle_t *r) {
     /*TODO return enum of collision direction instead*/
     int iu, id, il, ir, iv, ih;
-    iu = l->y > r->y && l->y < r->y + r->height;
-    id = l->y + l->height > r->y && l->y + l->height < r->y + r->height;
-    il = l->x > r->x && l->x < r->x + r->width;
-    ir = l->x + l->width > r->x && l->x + l->width < r->x + r->width;
+    iu = l->y >= r->y && l->y <= r->y + r->height;
+    id = l->y + l->height >= r->y && l->y + l->height <= r->y + r->height;
+    il = l->x >= r->x && l->x <= r->x + r->width;
+    ir = l->x + l->width >= r->x && l->x + l->width <= r->x + r->width;
 
-    iv = (id) || (l->y < r->y && l->y + l->height > r->y + r->height) || (iu);
-    ih = (il) || (l->x < r->x && l->x + l->width > r->x + r->width)   || (ir);
+    iv = (id) || (l->y <= r->y && l->y + l->height >= r->y + r->height) || (iu);
+    ih = (il) || (l->x <= r->x && l->x + l->width >= r->x + r->width)   || (ir);
 
     return (iv && ih);
 
@@ -528,6 +622,7 @@ int rectangle_check_collision(rectangle_t *l, rectangle_t *r) {
     return 0;
     */
 }
+
 
 /* properly removes rectangle and destroys it */
 void plane_remove_rectangle(plane_t *plane, size_t index) {
@@ -576,4 +671,3 @@ double rectangle_distance(rectangle_t *left, rectangle_t *right) {
 
     return sqrt(dcx*dcx + dcy*dcy);
 }
-

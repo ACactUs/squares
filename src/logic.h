@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <math.h>
 
 /*CONFIG*/
 #define SIZE_DIFF_TRESHOLD          1.2f        /* rect must be ... times bigger in order to eat another rect*/
@@ -14,20 +15,27 @@
 #define SPEED_ABS_MAX               15
 #define RECTANGLE_INIT_MAX_RETRIES  10
 #define TICK_NSEC                   5000000LL   /* 500ticks/sec */
+#define NSEC_IN_SEC                 1000000000LL 
 #define BOUNCE_SPEED_FINE           0.4         /* spd = spd - spd*fine*/
 /*INITS*/
 #define RANDOM_NO_STIM  (rand() % SE_NUMBER)
 #define RANDOM_FOOD     (rand() % FE_NUMBER)
 #define RANDOM_BIG      (rand() % BE_NUMBER)
 #define RANDOM_PREY     (rand() % PE_NUMBER)
-/*DEFAULT TRAITS*/
-#define DEFAULT_MSPEED       3 
-#define DEFAULT_AVOID_DIST   10     
-#define DEFAULT_AVOID_SPEED  4      
-#define DEFAULT_PURSUE_DIST  10      
-#define DEFAULT_PURSUE_SPEED 4.5      
-#define DEFAULT_FOOD_DIST    5    
-#define DEFAULT_FOOD_SPEED   4     
+/* DEFAULT TRAITS
+ * time in seconds,
+ * distance in units,
+ * speed in units per second
+ * etc...*/
+#define DEFAULT_MSPEED          3 
+#define DEFAULT_ACCEL           1.5
+#define DEFAULT_MRANDOM_DELAY   4
+#define DEFAULT_AVOID_DIST      6
+#define DEFAULT_AVOID_SPEED     4      
+#define DEFAULT_PURSUE_DIST     7      
+#define DEFAULT_PURSUE_SPEED    4.5      
+#define DEFAULT_FOOD_DIST       5    
+#define DEFAULT_FOOD_SPEED      4     
 /*END CONFIG*/
 
 /* IMPORTANT NOTICE
@@ -35,6 +43,9 @@
 
 #define MAX(a,b) ((a) > (b) ? a : b)
 #define MIN(a,b) ((a) < (b) ? a : b)
+#define true  1
+#define false 0
+#define DELTA 0.000005
 
 /* another rect is same size, bigger or smaller than rect */
 enum size_diff_e {sd_same, sd_prey, sd_hunter};
@@ -49,7 +60,7 @@ enum prey       { po_idle, po_random, po_lrandom, po_avoid, po_seek, PE_NUMBER }
 enum actions    { a_no_stim, a_food, a_big, a_prey }; 
 
 /* traits index kept in enum are used to access items in traits array */
-enum traits     { ti_mspeed=0, ti_avoid_dist, ti_avoid_speed, ti_pursue_dist, ti_pursue_speed, ti_food_dist, ti_food_speed, TIE_NUMBER };
+enum traits     { ti_mspeed=0, ti_accel, ti_mrandom_delay, ti_avoid_dist, ti_avoid_speed, ti_pursue_dist, ti_pursue_speed, ti_food_dist, ti_food_speed, TIE_NUMBER };
 
 /* this type represents selected action's enum number */
 typedef struct {
@@ -68,7 +79,7 @@ typedef enum {
 } SQ_COLORS;
 
 typedef struct rectanlge {
-    char *name;                 //FIXME memory
+    char *name;                 //FIXME use char array instead
     SQ_COLORS color;
     size_t frags;
     
@@ -78,8 +89,8 @@ typedef struct rectanlge {
     double energy;
     double energy_stored;
 
-    size_t ticks_idle;          /* number of ticks w/o stimuli */
-    struct timespec timer;      /* timespec of an event */
+    double secs_idle;           /* number of seconds w/o stimuli */
+    double timer;               /* used by any of action functs*/
     int move_time;              /* ??? */
 
     actions_opt_t actions;
@@ -87,6 +98,14 @@ typedef struct rectanlge {
     struct rectangle *lock;     /* pointer to rectangle which rect is locked to*/
 } rectangle_t;
 
+/* checks if timer elapsed
+ * if elapsed sets timer to current time and returnt true
+ * if not returns false*/
+//TODO move all duplicate code
+void timer_waitreset(struct timespec *start, long long nsecs);
+void timer_reset(struct timespec *start);
+void timer_wait(struct timespec *start, long long nsecs);
+int  timer_check(struct timespec *start, long long nsecs);
 
 rectangle_t *rectangle_create(); /*done*/
 
@@ -110,8 +129,6 @@ rectangle_t *rectangle_compare(rectangle_t *left, rectangle_t *right); /*done*/
 
 double rectangle_size(rectangle_t *rect); /*done*/
 
-
-
 typedef struct {
     double ysize, xsize;
     size_t rect_alive;
@@ -120,7 +137,6 @@ typedef struct {
     struct timespec ts_init;
     struct timespec ts_curr;
 } plane_t;
-
 
 void frame_render(plane_t plane); /*done*/
 
@@ -139,21 +155,23 @@ void rectangle_move_lrandom (plane_t *plane, size_t index);
 void rectangle_move_avoid   (plane_t *plane, size_t index); 
 void rectangle_move_seek    (plane_t *plane, size_t index); 
 
-/*this function is used to manage energy spendings for movement*/
-void rectangle_accelerate(rectangle_t *rect, double x, double y);
+/* this function returns acceleration at current tick 
+ * it also calculates energy spendings for acceleration
+ * WARN function does not perform speed limit checks*/
+void rectangle_accelerate(rectangle_t *rect, double speed, double angle);
 
 /*returns enum value of action which will be delegated to rectangle*/
-enum actions rectangle_action_get(plane_t *plane, size_t index);
+enum actions rectangle_action_get(plane_t *plane, size_t index); /*done*/
 
 /*performs one of N possible actions determined by rectangle_action_get*/
-void rectangle_act(plane_t *plane, size_t index);
+void rectangle_act(plane_t *plane, size_t index); /*done*/
 
 /* changes rectangle coordinates and resolves collisions for one tick 
  * breaks if index, plane or rectangle is invalid*/
-void rectangle_simulate(plane_t *plane, size_t index);
+void rectangle_simulate(plane_t *plane, size_t index); /*done*/
 
 /* returns distance between two rectangles' *centers* */
-double rectangle_distance(rectangle_t *left, rectangle_t *right);
+double rectangle_distance(rectangle_t *left, rectangle_t *right); /*TODO better estimate*/
 
 plane_t *plane_create(double xsize, double ysize); /*done*/
 
@@ -163,13 +181,13 @@ void plane_init(plane_t *plane, rectangle_t **rects, size_t rects_size); /*done*
 /* need func which conditions plane reset*/
 void plane_destroy(plane_t *plane); /*done*/
 
-void plane_remove_rectangle(plane_t *plane, size_t index);
+void plane_remove_rectangle(plane_t *plane, size_t index); /*done*/
 
 /* returns first collision rectangle index, sets flag true if collision happened*/
-size_t plane_check_collisions(plane_t *plane, size_t index, int *flag_collided); 
+size_t plane_check_collisions(plane_t *plane, size_t index, int *flag_collided); /*FIXME*/
 
 /* returns index of first rectanle which matches threshold */
-size_t plane_get_proximate_rectangle(plane_t *plane, size_t index, double mindist, enum size_diff_e type, int *flagExists);
+size_t plane_get_proximate_rectangle(plane_t *plane, size_t index, double mindist, enum size_diff_e type, int *flagExists); /*done*/
 
 /* should be called on collision, manages rectagles fight only */
 void rectangle_collision_fight(plane_t *plane, size_t left, size_t right); /*done*/

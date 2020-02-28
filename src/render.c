@@ -71,11 +71,17 @@ void render_rectangle(render_state_t *state, size_t index) {
     int rresp = wresize(win, lines, cols);
 
 
-    /*resize rect win*/
+    /* resize rect win to (1,1) and retry */
     if ((ERR == mresp) | (ERR == rresp)) {
-        render_status(state, "ERR: could not move window, render canceled... press any key");
-        wgetch(state->status);
-        return;
+        wresize(win, 1, 1);
+        mresp = mvwin(win, (int)rect->y, (int)rect->x);
+        rresp = wresize(win, lines, cols);
+        if ((ERR == mresp) | (ERR == rresp)) {
+            render_status(state, "ERR: could not move window, render canceled... press any key");
+            wgetch(state->status);
+            return;
+        }
+
         //resize 1x1 TODO
         //move
         //resize h*w
