@@ -1,9 +1,11 @@
 #include "logic.h"
 #include <math.h>
+#include <stdlib.h>
 
 void rectangle_default_traits(rectangle_t *rect){
     rect->traits[ti_mspeed          ] = DEFAULT_MSPEED;
     rect->traits[ti_accel           ] = DEFAULT_ACCEL;
+    rect->traits[ti_nostim_secs     ] = DEFAULT_NOSTIM_SECS;
     rect->traits[ti_mrandom_delay   ] = DEFAULT_MRANDOM_DELAY;
     rect->traits[ti_avoid_dist      ] = DEFAULT_AVOID_DIST;
     rect->traits[ti_avoid_speed     ] = DEFAULT_AVOID_SPEED;
@@ -172,7 +174,6 @@ void action_prey(plane_t *plane, size_t index) {
 void rectangle_accelerate(rectangle_t *rect, double speed, double angle) {
     double time_needed = speed / rect->traits[ti_accel]; /* time in seconds to accelerate */
 
-
     //TODO handle negative angles
     while (angle > 2*M_PI) angle -= M_PI;
     double x=0, y=0;
@@ -222,8 +223,14 @@ void rectangle_hybernate    (plane_t *plane, size_t index) { rectangle_TESTMOVE(
 
 void rectangle_move_random  (plane_t *plane, size_t index) { 
     rectangle_t *rect = plane->rects[index];
-    //FIXME random angle
-    double angle = M_PI * 1 + M_PI / 4;
+    //FIXME random angle 
+    double angle = rect->angle;
+    if (rect->secs_timer >= rect->traits[ti_mrandom_delay]) {
+        angle = ((double)rand() / RAND_MAX) * 2 * M_PI;
+        rect->secs_timer = 0;
+        rect->angle = angle;
+    }
+
     rectangle_accelerate(rect, 5, angle);
 }
 
@@ -270,26 +277,6 @@ int timer_check(struct timespec *start, long long nsecs) {
 }
 
 void frame_simulate(plane_t *plane) {
-    //FIXME call timer_waitreset instead
-    /*
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    long long nsec_elapsed = (ts.tv_sec - plane->ts_curr.tv_sec) * NSEC_IN_SEC
-                                    + ts.tv_nsec - plane->ts_curr.tv_nsec;
-
-
-    if (nsec_elapsed < TICK_NSEC) {
-        //clock_gettime(CLOCK_MONOTONIC, &plane->ts_curr);
-        long long wait_nsec = TICK_NSEC - nsec_elapsed;
-        ts.tv_sec  = 0;
-        while (wait_nsec >= NSEC_IN_SEC) {
-            ts.tv_sec++;
-            wait_nsec -= NSEC_IN_SEC;
-        }
-        ts.tv_nsec = wait_nsec;
-        nanosleep(&ts, NULL);
-    }
-    */
     timer_wait(&plane->ts_curr, TICK_NSEC);
     size_t max = plane->rect_max;
     size_t i;
@@ -317,6 +304,22 @@ enum actions rectangle_action_get(plane_t *plane, size_t index) {
 
 void rectangle_act(plane_t *plane, size_t index) {
     enum actions action = rectangle_action_get(plane, index);
+    rectangle_t *rect = plane->rects[index];
+    /* update rectangle timers */
+    double dtime = (double)TICK_NSEC / (double)NSEC_IN_SEC;
+    rect->secs_timer += dtime;
+    /* switch to a_no_stim if rect did not get any other action during ti_nostim_secs */
+    if (action == a_no_stim){
+        rect->secs_idle += dtime;
+        double delay = rect->traits[ti_mrandom_delay];
+        if (rect->secs_idle >= delay) {
+            rect->secs_idle = 0;
+            action = a_no_stim;
+        } else {
+            action = rect->prev_action;
+        }
+    }
+
     switch (action) {
         case a_no_stim:
             action_nostim(plane, index);
@@ -332,6 +335,7 @@ void rectangle_act(plane_t *plane, size_t index) {
             break;
     }
     rectangle_simulate(plane, index);
+    rect->prev_action = action;
 }
 
 int rectangle_borders_resolve(plane_t *plane, size_t index) {
@@ -670,4 +674,10 @@ double rectangle_distance(rectangle_t *left, rectangle_t *right) {
     dcy = (lcy - rcy);
 
     return sqrt(dcx*dcx + dcy*dcy);
+}
+
+int plane_is_rect_alive(plane_t *plane, size_t index) {
+    if (index < 0) return false;
+    if (index > plane->rect_max) return false;
+    return plane->rects[index] != NULL;
 }

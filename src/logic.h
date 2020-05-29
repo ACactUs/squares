@@ -4,6 +4,7 @@
 #include <string.h>
 #include <time.h>
 #include <math.h>
+//TODO include logger and implement logging interface
 
 /*CONFIG*/
 #define SIZE_DIFF_TRESHOLD          1.2f        /* rect must be ... times bigger in order to eat another rect*/
@@ -23,13 +24,15 @@
 #define RANDOM_BIG      (rand() % BE_NUMBER)
 #define RANDOM_PREY     (rand() % PE_NUMBER)
 /* DEFAULT TRAITS
+ * stored as DOUBLES
  * time in seconds,
  * distance in units,
  * speed in units per second
  * etc...*/
 #define DEFAULT_MSPEED          3 
-#define DEFAULT_ACCEL           1.5
-#define DEFAULT_MRANDOM_DELAY   4
+#define DEFAULT_ACCEL           500000000000        /* FIXME instant acceleration */
+#define DEFAULT_NOSTIM_SECS     3
+#define DEFAULT_MRANDOM_DELAY   2
 #define DEFAULT_AVOID_DIST      6
 #define DEFAULT_AVOID_SPEED     4      
 #define DEFAULT_PURSUE_DIST     7      
@@ -60,7 +63,7 @@ enum prey       { po_idle, po_random, po_lrandom, po_avoid, po_seek, PE_NUMBER }
 enum actions    { a_no_stim, a_food, a_big, a_prey }; 
 
 /* traits index kept in enum are used to access items in traits array */
-enum traits     { ti_mspeed=0, ti_accel, ti_mrandom_delay, ti_avoid_dist, ti_avoid_speed, ti_pursue_dist, ti_pursue_speed, ti_food_dist, ti_food_speed, TIE_NUMBER };
+enum traits     { ti_mspeed=0, ti_accel, ti_nostim_secs,  ti_mrandom_delay, ti_avoid_dist, ti_avoid_speed, ti_pursue_dist, ti_pursue_speed, ti_food_dist, ti_food_speed, TIE_NUMBER };
 
 /* this type represents selected action's enum number */
 typedef struct {
@@ -86,14 +89,16 @@ typedef struct rectanlge {
     double y, x;
     double height, width;
     double yspeed, xspeed;
+    double angle;               /* direction in which rectangle tries to move */
     double energy;
     double energy_stored;
 
     double secs_idle;           /* number of seconds w/o stimuli */
-    double timer;               /* used by any of action functs*/
+    double secs_timer;          /* used by any of action functs*/
     int move_time;              /* ??? */
 
     actions_opt_t actions;
+    enum actions prev_action;
     double traits[TIE_NUMBER];  /* array of traits, max index=TIE_NUMBER*/
     struct rectangle *lock;     /* pointer to rectangle which rect is locked to*/
 } rectangle_t;
@@ -200,3 +205,6 @@ void rectangle_collision_resolve(plane_t *plane, size_t left); /*done*/
 /* checks for and resolves borders collision in this iteration
  * returns true if resolution did happen, false if nothing was changed */
 int rectangle_borders_resolve(plane_t *plane, size_t index); /*TODO move code from rectangle_simulate */
+
+/* safely returns true only if rectangle is alive, else return 0 */
+int plane_is_rect_alive(plane_t *plane, size_t index);

@@ -1,9 +1,10 @@
 #include <ncurses.h>
 #include <time.h>
 #include "logic.h"
+#include <errno.h>
 
-
-#define RENDER_NSEC  16666666LL             /*60fps 16666666LL*/
+#define RENDER_NSEC 33333333LL             /*60fps 16666666LL; 30fps 33333333LL*/
+#define INPUT_NSEC  16666666LL             /*60fps 16666666LL; 30fps 33333333LL*/
 
 enum zoom       { zo_none };
 enum color_pairs{ cp_wb=1, cp_bw };
@@ -21,9 +22,14 @@ typedef struct {
                       * as their windows in render_state_t->rect_wins 
                       * if rectangle is dead then corresponding index in plane_t and
                       * in render_state_t point to NULL element*/
-   struct timespec ts_last;
+   struct timespec ts_last_render;
+   struct timespec ts_last_input;
    struct timespec ts_init;
 } render_state_t;
+
+/********************************
+ *      RENDER FUNCTIONS        *
+ ********************************/
 
 render_state_t *render_init(); /*done*/
 void render_exit(render_state_t *state); /*done*/
@@ -42,3 +48,14 @@ void render_rectangle(render_state_t *state, size_t index); /*done*/
 void render_status(render_state_t *state, char *message); /*done*/
 
 void render_clear_status(render_state_t *state); /*done*/
+
+/******************************
+ * USER INTERACTION FUNCTIONS *
+ ******************************/
+
+/* all user input is processed here
+ * depends on ts_last_input timer
+ * input freq is defined by INPUT_NSEC in header 
+ * this function should only handle user input and then call 
+ * functions from logic.h, to modify plane_t state */
+int control_cycle(render_state_t *state);
