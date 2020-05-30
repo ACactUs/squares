@@ -49,6 +49,8 @@ void render_status(render_state_t *state, char *message); /*done*/
 
 void render_clear_status(render_state_t *state); /*done*/
 
+int render_popup(render_state_t *state, char *message);
+
 /******************************
  * USER INTERACTION FUNCTIONS *
  ******************************/

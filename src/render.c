@@ -1,19 +1,21 @@
 #include "render.h"
 #include "logic.h"
+#include <stdio.h>
 #include <time.h>
 #include <curses.h>
 #include <string.h>
 
 void render_greeting(render_state_t *state) {
-    WINDOW *greetings = newwin(5, 40, state->maxy/2 - 3, state->maxx/2 - 20);
-    box(greetings, 0, 0);
-    mvwprintw(greetings, 2, 2, "Please, do not resize the terminal");
-    render_status(state, "Statusbar initialized..... OK");
-    wgetch(greetings);
-    wclear(greetings);
-    wrefresh(greetings);
-    delwin(greetings);
+    const size_t msize = 512;
+    char message[msize];
+    snprintf(message, msize, 
+            "Press h to get help and see options\n\nScreen width %d, height %d\nPlane width %lf, height %lf\nPlane has %zu rectangles", 
+            state->canv_maxx, state->maxy, 
+            state->plane->xsize, state->plane->ysize, 
+            state->plane->rect_max);
+    render_status(state, "Status initialized..... OK");
     box(state->canvas, 0, 0);
+    render_popup(state, message);
     wrefresh(state->canvas);
 }
 
@@ -76,10 +78,9 @@ void render_rectangle(render_state_t *state, size_t index) {
     int rresp = wresize(win, lines, cols);
 
     size_t m_len = 5;
-    char *message = calloc(sizeof(char), m_len);
+    char message[m_len];
     snprintf(message, m_len, "%zu", index);
     mvwprintw(win, 1, 1, message);
-    free(message);
 
 
     /* resize rect win to (1,1) and retry */
@@ -189,6 +190,65 @@ void render_exit(render_state_t *state) {
     render_unload(state);
     free(state);
     endwin();
+    exit(0);
+}
+
+/*FIXME last line is not being printed*/
+int render_popup(render_state_t *state, char *message) {
+    /* calculate width */
+    const int   max_rets = 32;
+
+
+    int i;
+    char *start_ptr = message;  /*& of char after last \n*/
+    char *nl_ptr;               /* current \n or NULL*/
+    int lens[max_rets];
+    int rets = 0;
+    for (i = 0; i < max_rets; i++) {
+        rets++;
+        nl_ptr = strchr(start_ptr, '\n');
+        /* calculate max width */
+        if (nl_ptr == NULL) {
+            size_t len = strlen(start_ptr);
+            lens[i] = (int)len;
+            break;
+        } else
+        if (*nl_ptr == '\n') {
+            size_t len = (size_t)(start_ptr - nl_ptr);
+            lens[i] = (int)len;
+            start_ptr = nl_ptr + 1;
+            continue;
+        } 
+    }
+    
+    const int width = (int)(state->maxx * 0.6);
+    /*calculate height*/
+    int height = rets;
+    for (i = 0; i < rets; i++) {
+        int carry = lens[i] / width;
+        height += carry;
+        if (carry && lens[i] % width != 0) height++;
+    }
+
+    int x0 = (state->maxx - width)/2;
+    int y0 = (state->maxy - height)/2;
+
+    WINDOW *box = newwin(height+2, width+2, y0-1, x0-1);
+    box(box, 0, 0);
+    wrefresh(box);
+
+    WINDOW *popup = newwin(height, width, y0, x0);
+    wprintw(popup, message);
+    //box(popup, 0, 0);
+    wrefresh(popup);
+
+    nodelay(popup, false);
+    int key = wgetch(popup);
+
+    delwin(box);
+    delwin(popup);
+
+    return key;
 }
 
 /* errno is set by strtol if it encounters error
@@ -218,9 +278,11 @@ int control_cycle(render_state_t *state) {
     /* read key TODO, implement input window*/
 
     int key = wgetch(state->status);
+    int is_event = true;
     switch (key) {
         /* no input this time*/
         case ERR:
+            is_event = false;
             break;
         /* space -> pause game until pressed again*/
         case ' ':
@@ -250,12 +312,66 @@ int control_cycle(render_state_t *state) {
                 }
                 break;
             }
+        case 'h':
+            {
+                char *message = "HELP\n------------\n[h]: see help\n[k]: kill rectangle\n[r]: restart\n[q]: quit :(\nSPACE: pause game";
+                render_popup(state, message);
+                break;
+            }
+        case 'p':
+            {
+                const int max_size = 512;
+                char message[max_size];
 
+                render_status(state, "Print index: ");
+                size_t target = (size_t)input_int(state->status);
+                noecho();
+                if (!errno) {
+                    if (plane_is_rect_alive(state->plane, target)) {
+                        render_status(state, "Printing");
+                        rectangle_t *rect = state->plane->rects[target];
+                        snprintf(message, max_size, 
+                                "I: %zu, N: %s,\na: %f, y: %f, x: %f, h: %f, w: %f\nenrg: %f",
+                                target, rect->name, 
+                                rect->angle, rect->y, rect->x, rect->height, rect->width,
+                                rect->energy);
+                        render_popup(state, message);
+                    } else {
+                        render_status(state, "Rectangle does not exist");
+                    }
+                } else {
+                    errno = 0;
+                    render_status(state, "Not a number");
+                }
+                break;
+            }
+        case 'q':
+            {
+                int key = render_popup(state, "Exit? [y,q/N]");
+                if (key == 'y' || key == 'q') render_exit(state);
+                break;
+            }
+        case 'r':
+            {
+                int key = render_popup(state, "Restart? [y,r/N]");
+                if (key == 'y' || key == 'r') {
+                    plane_t *p = state->plane;
+                    render_unload(state);
+                    plane_destroy(p);
+
+                    /* TODO ask user to fill fields*/
+                    p = plane_create(state->canv_maxx+1, state->canv_maxy+1);
+                    plane_init(p, NULL, 10);
+                    render_load(state, p);
+                    return false;
+                }
+            }
+            break;
 
         /* TODO implement: 
-         * h - display help
-         * e - edit rectangle
-         * p - print rectangle state*/
+         * e - edit rectangle interactively (table)
+         * m - move rectangle interactively (redraw) 
+         * r - restart */
 
         /*TODO define broad message box*/
 
@@ -266,4 +382,7 @@ int control_cycle(render_state_t *state) {
     
     /* reset clock */
     clock_gettime(CLOCK_MONOTONIC, &state->ts_last_input);
+
+    return is_event;
 }
+

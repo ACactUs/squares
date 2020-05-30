@@ -8,16 +8,18 @@
 
 /*CONFIG*/
 #define SIZE_DIFF_TRESHOLD          1.2f        /* rect must be ... times bigger in order to eat another rect*/
-#define WIDTH_INIT_MIN              4
+#define WIDTH_INIT_MIN              4           /* rectangle size at start will be between MIN and MAX*/
 #define WIDTH_INIT_MAX              10
-#define HEIGHT_INIT_MIN             4
-#define HEIGHT_INIT_MAX             10
-#define SPEED_INIT_MAX              4
-#define SPEED_ABS_MAX               15
-#define RECTANGLE_INIT_MAX_RETRIES  10
-#define TICK_NSEC                   5000000LL   /* 500ticks/sec */
+#define HEIGHT_INIT_MIN             4           
+#define HEIGHT_INIT_MAX             10          
+#define SPEED_INIT_MAX              4           /* at game start rectangle speed is not higher than this*/
+#define SPEED_ABS_MAX               15          /* highest possible speed*/
+#define RECTANGLE_INIT_MAX_RETRIES  10          /* stop retrying to spawn rectangle after x attempts*/
+#define TICK_NSEC                   5000000LL   /* 5000000LL => 500ticks/sec, number of ns between ticks*/
 #define NSEC_IN_SEC                 1000000000LL 
 #define BOUNCE_SPEED_FINE           0.4         /* spd = spd - spd*fine*/
+#define COLLISION_DELTA             (float)((float)SPEED_ABS_MAX * TICK_NSEC / NSEC_IN_SEC)
+
 /*INITS*/
 #define RANDOM_NO_STIM  (rand() % SE_NUMBER)
 #define RANDOM_FOOD     (rand() % FE_NUMBER)
@@ -30,7 +32,7 @@
  * speed in units per second
  * etc...*/
 #define DEFAULT_MSPEED          3 
-#define DEFAULT_ACCEL           500000000000        /* FIXME instant acceleration */
+#define DEFAULT_ACCEL           1        /* FIXME instant acceleration */
 #define DEFAULT_NOSTIM_SECS     3
 #define DEFAULT_MRANDOM_DELAY   2
 #define DEFAULT_AVOID_DIST      6
@@ -88,7 +90,7 @@ typedef struct rectanlge {
     
     double y, x;
     double height, width;
-    double yspeed, xspeed;
+    double yspeed, xspeed;      /* real rectangle speed at any moment*/
     double angle;               /* direction in which rectangle tries to move */
     double energy;
     double energy_stored;
