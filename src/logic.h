@@ -65,7 +65,7 @@ enum prey       { po_idle, po_random, po_lrandom, po_avoid, po_seek, PE_NUMBER }
 enum actions    { a_no_stim, a_food, a_big, a_prey }; 
 
 /* traits index kept in enum are used to access items in traits array */
-enum traits     { ti_mspeed=0, ti_accel, ti_nostim_secs,  ti_mrandom_delay, ti_avoid_dist, ti_avoid_speed, ti_pursue_dist, ti_pursue_speed, ti_food_dist, ti_food_speed, TIE_NUMBER };
+enum traits     { ti_mspeed=0, ti_accel, ti_nostim_secs, ti_mrandom_delay, ti_avoid_dist, ti_avoid_speed, ti_pursue_dist, ti_pursue_speed, ti_food_dist, ti_food_speed, TIE_NUMBER };
 
 /* this type represents selected action's enum number */
 typedef struct {

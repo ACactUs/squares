@@ -15,7 +15,7 @@ void render_greeting(render_state_t *state) {
             state->plane->rect_max);
     render_status(state, "Status initialized..... OK");
     box(state->canvas, 0, 0);
-    render_popup(state, message);
+    render_popup_getch(state, message);
     wrefresh(state->canvas);
 }
 
@@ -129,12 +129,15 @@ void render_load(render_state_t *state, plane_t *plane) {
 void render_unload(render_state_t *state) {
     /* close every non-NULL window*/
     size_t i;
-    size_t wins = state->plane->rect_max;
-    for (i = 0; i < wins; i++) {
-        WINDOW *win = state->rect_wins[i];
-        if (!win) continue;
-        delwin(win);
-        state->rect_wins[i] = NULL;
+    if (!state) return;
+    if (state->plane) {
+        size_t wins = state->plane->rect_max;
+        for (i = 0; i < wins; i++) {
+            WINDOW *win = state->rect_wins[i];
+            if (!win) continue;
+            delwin(win);
+            state->rect_wins[i] = NULL;
+        }
     }
     free(state->rect_wins);
     state->plane = NULL;
@@ -145,10 +148,11 @@ render_state_t *render_init() {
     initscr();
     cbreak();
     
-
+    /* TODO support colorless terms */
     if (!has_colors() || !can_change_color() ) {
         fprintf(stderr, "Sorry, your terminal does not support color changing\n");
         render_exit(state);
+        
         exit(1);
     }
 
@@ -193,19 +197,17 @@ void render_exit(render_state_t *state) {
     exit(0);
 }
 
-/*FIXME last line is not being printed*/
-int render_popup(render_state_t *state, char *message) {
-    /* calculate width */
+/* returns -1 on fail */
+int calculate_height(char *message, int width) {
     const int   max_rets = 32;
-
 
     int i;
     char *start_ptr = message;  /*& of char after last \n*/
     char *nl_ptr;               /* current \n or NULL*/
     int lens[max_rets];
-    int rets = 0;
+    int newlines = 0;
     for (i = 0; i < max_rets; i++) {
-        rets++;
+        newlines++;
         nl_ptr = strchr(start_ptr, '\n');
         /* calculate max width */
         if (nl_ptr == NULL) {
@@ -220,15 +222,27 @@ int render_popup(render_state_t *state, char *message) {
             continue;
         } 
     }
+
+    if (i == max_rets) return -1;
     
-    const int width = (int)(state->maxx * 0.6);
     /*calculate height*/
-    int height = rets;
-    for (i = 0; i < rets; i++) {
+    int height = newlines;
+    for (i = 0; i < newlines; i++) {
+        //FIXME "left operand has garbage value"
         int carry = lens[i] / width;
         height += carry;
         if (carry && lens[i] % width != 0) height++;
     }
+
+    return height;
+}
+
+/*FIXME last line is not being printed*/
+int render_popup_getch(render_state_t *state, char *message) {
+    int width  = (int)(state->maxx * 0.6);
+    int height = calculate_height(message, width);
+
+    if (height == -1) return 0;
 
     int x0 = (state->maxx - width)/2;
     int y0 = (state->maxy - height)/2;
@@ -239,7 +253,6 @@ int render_popup(render_state_t *state, char *message) {
 
     WINDOW *popup = newwin(height, width, y0, x0);
     wprintw(popup, message);
-    //box(popup, 0, 0);
     wrefresh(popup);
 
     nodelay(popup, false);
@@ -267,6 +280,172 @@ long input_int(WINDOW *win) {
     return num;
 }
 
+/* WARN string must be freed after use */
+char *input_string(render_state_t *state, char *prompt) {
+    WINDOW *win = state->status;
+    int was_nodelay = is_nodelay(win);
+    nodelay(win, false);
+    echo();
+    int i_size = 128;
+    char *input = calloc(sizeof(char), (size_t)i_size);
+    mvwprintw(win, 0, 0, prompt);
+    wgetnstr(win, input, i_size);
+
+    if (was_nodelay) nodelay(win, true);
+    return input;
+}
+
+/* returns 0 on success */
+int input_2doubles(render_state_t *state, char *message, double *a, double *b) {
+    float x, y;
+    char *input = input_string(state, message);
+    int nscaned = sscanf(input, "%f %f", &x, &y);
+    free(input);
+
+    if (nscaned != 2) {
+        render_status(state, "Input failed");
+        return -1;
+    }
+
+    *a = x;
+    *b = y;
+
+    return 0;
+}
+
+void ckey_space(render_state_t *state) {
+    /* FIXME messes up in-game time representation
+     * pause should be defined in logic.c and used inside simulate func */
+    nodelay(state->status, false);
+    render_status(state, "Game is paused, press any key to unpause...");
+    wgetch(state->status);
+    nodelay(state->status, true);
+    render_status(state, "Unpaused...");
+}
+
+void ckey_k(render_state_t *state) {
+    render_status(state, "Kill index: ");
+    size_t target = (size_t)input_int(state->status);
+    noecho();
+    if (!errno) {
+        if (plane_is_rect_alive(state->plane, target)) {
+            plane_remove_rectangle(state->plane, target);
+            render_status(state, "Removed!");
+        } else {
+            render_status(state, "Rectangle does not exist");
+        }
+    } else {
+        errno = 0;
+        render_status(state, "Not a number");
+    }
+}
+
+void ckey_p(render_state_t *state) {
+    const int max_size = 512;
+    char message[max_size];
+
+    render_status(state, "Print index: ");
+    size_t target = (size_t)input_int(state->status);
+    noecho();
+    if (!errno) {
+        if (plane_is_rect_alive(state->plane, target)) {
+            render_status(state, "Printing");
+            rectangle_t *rect = state->plane->rects[target];
+            snprintf(message, max_size, 
+                    "I: %zu, N: %s,\na: %f, y: %f, x: %f, h: %f, w: %f\nenrg: %f",
+                    target, rect->name, 
+                    rect->angle, rect->y, rect->x, rect->height, rect->width,
+                    rect->energy);
+            render_popup_getch(state, message);
+        } else {
+            render_status(state, "Rectangle does not exist");
+        }
+    } else {
+        errno = 0;
+        render_status(state, "Not a number");
+    }
+}
+
+/* move left corner */
+void ckey_e1(render_state_t *state, size_t target) {
+    rectangle_t *rect = state->plane->rects[target];
+    char msg[64] = {0};
+    snprintf(msg, 64, "(x=%f, y=%f)Enter new [x y]: ", rect->x, rect->y);
+
+    double x, y;
+    int ret = input_2doubles(state, msg, &x, &y);
+
+    if (ret != 0) return;
+
+    if (x < 0 || y < 0 || 
+        x + rect->width > state->plane->xsize || 
+        y + rect->height > state->plane->ysize
+    ) {
+        render_status(state, "Invalid coordinates");
+    } else {
+        rect->x = x;
+        rect->y = y;
+    }
+}
+
+/* resize */
+void ckey_e2(render_state_t *state, size_t target) {
+}
+
+void ckey_emenu(render_state_t *state, size_t target, int key) {
+    switch (key) {
+        case '1':
+            ckey_e1(state, target);
+            break;
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+            render_popup_getch(state, "Not implemented");
+            break;
+    }
+}
+
+void ckey_e(render_state_t *state) {
+    const int max_size = 512;
+    char message[max_size];
+
+    render_status(state, "Edit index: ");
+    size_t target = (size_t)input_int(state->status);
+    noecho();
+    if (!errno) {
+        if (plane_is_rect_alive(state->plane, target)) {
+            render_status(state, "Editing");
+            snprintf(message, max_size, 
+                    "Press key to edit\n-------\n1: left corner [x, y]\n2: [width, height]\n3: [energy]\n4: actions\n5: traits");
+            int key = render_popup_getch(state, message);
+            render_frame(state);
+            ckey_emenu(state, target, key);
+        } else {
+            render_status(state, "Rectangle does not exist");
+        }
+    } else {
+        errno = 0;
+        render_status(state, "Not a number");
+    }
+}
+
+int ckey_r(render_state_t *state) {
+    int key = render_popup_getch(state, "Restart? [y,r/N]");
+    if (key == 'y' || key == 'r') {
+        plane_t *p = state->plane;
+        render_unload(state);
+        plane_destroy(p);
+
+        /* TODO ask user to fill fields*/
+        p = plane_create(state->canv_maxx+1, state->canv_maxy+1);
+        plane_init(p, NULL, 10);
+        render_load(state, p);
+        return false;
+    }
+    return true;
+}
+
 int control_cycle(render_state_t *state) {
     /* check clock */
     struct timespec ts;
@@ -286,85 +465,33 @@ int control_cycle(render_state_t *state) {
             break;
         /* space -> pause game until pressed again*/
         case ' ':
-            /* FIXME messes up in-game time representation
-             * pause should be defined in logic.c and used inside simulate func */
-            nodelay(state->status, false);
-            render_status(state, "Game is paused, press any key to unpause...");
-            wgetch(state->status);
-            nodelay(state->status, true);
-            render_status(state, "Unpaused...");
+            ckey_space(state);
             break;
         case 'k':
-            {
-                render_status(state, "Kill index: ");
-                size_t target = (size_t)input_int(state->status);
-                noecho();
-                if (!errno) {
-                    if (plane_is_rect_alive(state->plane, target)) {
-                        plane_remove_rectangle(state->plane, target);
-                        render_status(state, "Removed!");
-                    } else {
-                        render_status(state, "Rectangle does not exist");
-                    }
-                } else {
-                    errno = 0;
-                    render_status(state, "Not a number");
-                }
-                break;
-            }
+            ckey_k(state);
+            break;
         case 'h':
             {
-                char *message = "HELP\n------------\n[h]: see help\n[k]: kill rectangle\n[r]: restart\n[q]: quit :(\nSPACE: pause game";
-                render_popup(state, message);
-                break;
+                char *message = "HELP\n------------\n[h]: see help\n[e]: edit rectangle\n[k]: kill rectangle\n[r]: restart\n[q]: quit :(\nSPACE: pause game";
+                render_popup_getch(state, message);
             }
+            break;
         case 'p':
-            {
-                const int max_size = 512;
-                char message[max_size];
-
-                render_status(state, "Print index: ");
-                size_t target = (size_t)input_int(state->status);
-                noecho();
-                if (!errno) {
-                    if (plane_is_rect_alive(state->plane, target)) {
-                        render_status(state, "Printing");
-                        rectangle_t *rect = state->plane->rects[target];
-                        snprintf(message, max_size, 
-                                "I: %zu, N: %s,\na: %f, y: %f, x: %f, h: %f, w: %f\nenrg: %f",
-                                target, rect->name, 
-                                rect->angle, rect->y, rect->x, rect->height, rect->width,
-                                rect->energy);
-                        render_popup(state, message);
-                    } else {
-                        render_status(state, "Rectangle does not exist");
-                    }
-                } else {
-                    errno = 0;
-                    render_status(state, "Not a number");
-                }
-                break;
-            }
+            ckey_p(state);
+            break;
+        case 'e':
+            ckey_e(state);
+            break;
         case 'q':
             {
-                int key = render_popup(state, "Exit? [y,q/N]");
+                int key = render_popup_getch(state, "Exit? [y,q/N]");
                 if (key == 'y' || key == 'q') render_exit(state);
-                break;
             }
+            break;
         case 'r':
             {
-                int key = render_popup(state, "Restart? [y,r/N]");
-                if (key == 'y' || key == 'r') {
-                    plane_t *p = state->plane;
-                    render_unload(state);
-                    plane_destroy(p);
-
-                    /* TODO ask user to fill fields*/
-                    p = plane_create(state->canv_maxx+1, state->canv_maxy+1);
-                    plane_init(p, NULL, 10);
-                    render_load(state, p);
-                    return false;
-                }
+                int is_restart = ckey_r(state);
+                if (is_restart) return false;
             }
             break;
 

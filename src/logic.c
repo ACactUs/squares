@@ -372,6 +372,53 @@ int rectangle_borders_resolve(plane_t *plane, size_t index) {
     return 0;
 }
 
+
+static inline double col_il(rectangle_t *r, rectangle_t *t) {
+    double xovershoot = r->x - t->y - t->width; //<0 checked
+    r->xspeed = -r->xspeed;
+    t->xspeed = -t->xspeed;
+
+    return xovershoot;
+}
+
+static inline double col_ir(rectangle_t *r, rectangle_t *t) {
+    double xovershoot = r->x + r->width - t->width; //>0 checked
+    r->xspeed = -r->xspeed;
+    t->xspeed = -t->xspeed;
+
+    return xovershoot;
+}
+
+
+static inline double col_iu(rectangle_t *r, rectangle_t *t) {
+    double yovershoot = r->y - (t->y + t->height); //<0 checked
+    r->yspeed = -r->yspeed;
+    t->yspeed = -t->yspeed;
+    
+    return yovershoot;
+}
+
+static inline double col_id(rectangle_t *r, rectangle_t *t) {
+    double yovershoot = r->y + r->height - t->y; //>0 checked
+    r->yspeed = -r->yspeed;
+    t->yspeed = -t->yspeed;
+
+    return yovershoot;
+}
+
+static inline void col_apply(rectangle_t *r, double *xovershoot, double *yovershoot) {
+        if (fabs(*xovershoot) > COLLISION_DELTA) {
+            *xovershoot = 0;
+        }
+        if (fabs(*yovershoot) > COLLISION_DELTA) {
+            *yovershoot = 0;
+        } 
+
+        r->x -= 2* *xovershoot;
+        r->y -= 2* *yovershoot;
+}
+
+/* lol clear bloat */
 void rectangle_collision_resolve(plane_t *plane, size_t index) {
     if (!plane->rects[index]) return; /* rectangle was killed, exit recursion */
     int flag_collided;
@@ -408,141 +455,61 @@ void rectangle_collision_resolve(plane_t *plane, size_t index) {
     ih = (il) || (r->x <= t->x && r->x + r->width >= t->x + t->width)   || (ir);
 
 
-    /* else if are chained to prevent double bounceback on angle collision */
     double xovershoot = 0, 
            yovershoot = 0;
+
     /* UP */
     if (iu && ih) {
         /* X overshoot */
-        /* if collision from side happened correct that side overshoot too*/
         if (il) { 
-            xovershoot = r->x - t->y - t->width; //<0 checked
-            //r->x -= 2*xovershoot;
-            r->xspeed = -r->xspeed;
-            t->xspeed = -t->xspeed;
-        } else 
-        if (ir) {
-            xovershoot = r->x + r->width - t->width; //>0 checked
-            //r->x -= 2*xovershoot;
-            r->xspeed = -r->xspeed;
-            t->xspeed = -t->xspeed;
+            xovershoot = col_il(r, t);
+        } else if (ir) {
+            xovershoot = col_ir(r, t);
         }
-
         /* Y overshoot */
-        yovershoot = r->y - (t->y + t->height); //<0 checked FIXME
-        r->yspeed = -r->yspeed;
-        t->yspeed = -t->yspeed;
-
-        /* overshoot can be no higher than delta to prevent teleport */
-        /* X overshoot to hight, assuming its Y collision -> remove xovershoot*/
-        if (fabs(xovershoot) > COLLISION_DELTA) {
-            xovershoot = 0;
-        }
-        /* Y overshoot to hight, assuming its X collision -> remove yovershoot*/
-        if (fabs(yovershoot) > COLLISION_DELTA) {
-            yovershoot = 0;
-        } 
-
-        r->x -= 2*xovershoot;
-        r->y -= 2*yovershoot;
-
+        yovershoot = col_iu(r, t);
+        col_apply(r, &xovershoot, &yovershoot);
         rectangle_collision_fight(plane, index, col_index);
     } 
     /* DOWN */
     else if (id && ih) {
         /* X overshoot*/
         if (il) { 
-            xovershoot = r->x - t->y - t->width; //<0 checked
-            //r->x -= 2*xovershoot;
-            r->xspeed = -r->xspeed;
-            t->xspeed = -t->xspeed;
-        } 
-        if (ir) {
-            xovershoot = r->x + r->width - t->width; //>0 checked
-            //r->x -= 2*xovershoot;
-            r->xspeed = -r->xspeed;
-            t->xspeed = -t->xspeed;
+            xovershoot = col_il(r, t);
+        } else if (ir) {
+            xovershoot = col_ir(r, t);
         }
-
         /* Y overshoot */
-        yovershoot = r->y + r->height - t->y; //>0 checked
-        r->yspeed = -r->yspeed;
-        t->yspeed = -t->yspeed;
-
-        if (fabs(xovershoot) > COLLISION_DELTA) {
-            xovershoot = 0;
-        }
-        if (fabs(yovershoot) > COLLISION_DELTA) {
-            yovershoot = 0;
-        } 
-
-        r->y -= 2*yovershoot;
-        r->x -= 2*xovershoot;
-
+        yovershoot = col_id(r, t);
+        col_apply(r, &xovershoot, &yovershoot);
         rectangle_collision_fight(plane, index, col_index);
     }     
     /* LEFT */
     else if (il && iv) {
         /* Y overshoot */
         if (iu) {
-            yovershoot = r->y - (t->y + t->height); //<0 checked
-            //r->y -= 2*yovershoot;
-            r->yspeed = -r->yspeed;
-            t->yspeed = -t->yspeed;
-        } else
-        if (id) {
-            yovershoot = r->y + r->height - t->y; //>0 checked
-            //r->y -= 2*yovershoot;
-            r->yspeed = -r->yspeed;
-            t->yspeed = -t->yspeed;
+            yovershoot = col_iu(r, t);
+        } else if (id) {
+            yovershoot = col_id(r, t);
         }
-        xovershoot = r->x - t->y - t->width; //<0 checked
-        r->xspeed = -r->xspeed;
-        t->xspeed = -t->xspeed;
-
-        if (fabs(xovershoot) > COLLISION_DELTA) {
-            xovershoot = 0;
-        } if (fabs(yovershoot) > COLLISION_DELTA) {
-            yovershoot = 0;
-        } 
-
-        r->x -= 2*xovershoot;
-        r->y -= 2*yovershoot;
-
+        /* X overshoot*/
+        xovershoot = col_il(r, t);
+        col_apply(r, &xovershoot, &yovershoot);
         rectangle_collision_fight(plane, index, col_index);
     }
     /* RIGHT */
     else if (ir && iv) {
         if (iu) {
-            yovershoot = r->y - (t->y + t->height); //<0 checked
-            //r->y -= 2*yovershoot;
-            r->yspeed = -r->yspeed;
-            t->yspeed = -t->yspeed;
-        } else
-        if (id) {
-            yovershoot = r->y + r->height - t->y; //>0 checked
-            //r->y -= 2*yovershoot;
-            r->yspeed = -r->yspeed;
-            t->yspeed = -t->yspeed;
+            yovershoot = col_iu(r, t);
+        } else if (id) {
+            yovershoot = col_id(r, t);
         }
-
-        xovershoot = r->x + r->width - t->width; //>0 checked
-        r->xspeed = -r->xspeed;
-        t->xspeed = -t->xspeed;
-
-        if (fabs(xovershoot) > COLLISION_DELTA) {
-            xovershoot = 0;
-        }
-        if (fabs(yovershoot) > COLLISION_DELTA) {
-            yovershoot = 0;
-        } 
-
-        r->x -= 2*xovershoot;
-        r->y -= 2*yovershoot;
+        /* X overshoot*/
+        xovershoot = col_ir(r, t);
+        col_apply(r, &xovershoot, &yovershoot);
         rectangle_collision_fight(plane, index, col_index);
     }
 
-    //rectangle_collision_resolve(plane, index);
     return;
 }
 
@@ -619,6 +586,7 @@ plane_t *plane_create(double xsize, double ysize) {
 }
 
 void plane_destroy(plane_t *plane) {
+    if (!plane) return;
     size_t i, max;
     max = plane->rect_max;
     rectangle_t **rects = plane->rects;
