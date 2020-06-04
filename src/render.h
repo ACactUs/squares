@@ -27,29 +27,32 @@ typedef struct {
    struct timespec ts_init;
 } render_state_t;
 
+extern render_state_t *rstate;
+
+
 /********************************
  *      RENDER FUNCTIONS        *
  ********************************/
 
-render_state_t *render_init(); /*done*/
-void render_exit(render_state_t *state); /*done*/
+void render_init(); /*done*/
+void render_exit(); /*done*/
 
-void render_load(render_state_t *state, plane_t *plane); /*done*/
-void render_unload(render_state_t *state); /*done*/
+void render_load(plane_t *plane); /*done*/
+void render_unload(); /*done*/
 
-void render_greeting(render_state_t *state); /*done*/
+void render_greeting(); /*done*/
 
 void zoom_set(plane_t *plane); 
 
-void render_frame(render_state_t *state); /*done*/
+void render_frame(); /*done*/
 
-void render_rectangle(render_state_t *state, size_t index); /*done*/
+void render_rectangle(int index); /*done*/
 
-void render_status(render_state_t *state, char *message); /*done*/
+void render_status(char *message); /*done*/
 
-void render_clear_status(render_state_t *state); /*done*/
+void render_clear_status(); /*done*/
 
-int render_popup_getch(render_state_t *state, char *message);
+int render_popup_getch(char *message);
 
 /******************************
  * USER INTERACTION FUNCTIONS *
@@ -60,4 +63,4 @@ int render_popup_getch(render_state_t *state, char *message);
  * input freq is defined by INPUT_NSEC in header 
  * this function should only handle user input and then call 
  * functions from logic.h, to modify plane_t state */
-int control_cycle(render_state_t *state);
+int control_cycle();

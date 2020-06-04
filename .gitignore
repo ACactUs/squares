@@ -4,4 +4,4 @@
 !src/*.h
 !.gitignore
 !.ycm_extra_conf.py
-!makefile
+!Makefile

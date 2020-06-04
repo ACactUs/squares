@@ -1,6 +1,15 @@
 #include "logic.h"
 #include <math.h>
+#include <errno.h>
 #include <stdlib.h>
+#include <stdio.h>
+
+const char *trait_names[] = {
+    "movement speed", "acceleration", "seconds to idle",
+    "random move delay", "avoid distance", "avoid speed",
+    "pursue distance", "pursue speed", "food detection distance",
+    "food pursue speed",
+"traits number" };
 
 void rectangle_default_traits(rectangle_t *rect){
     rect->traits[ti_mspeed          ] = DEFAULT_MSPEED;
@@ -28,10 +37,8 @@ rectangle_t *rectangle_create() {
 }
 
 void rectangle_destroy(rectangle_t *rect) {
-    if (rect->name) free(rect->name);
     free(rect);
 }
-
 
 void rectangle_resize_x(rectangle_t *rect, float ratio) { 
     //if ( !ratio ) return;
@@ -49,7 +56,7 @@ rectangle_t *rectangle_copy(rectangle_t *rect) {
     return copy;
 }
 
-void rectangle_collision_fight(plane_t *plane, size_t left, size_t right) {
+void rectangle_collision_fight(plane_t *plane, int left, int right) {
     if (left == right) return; 
 
     rectangle_t *lrect, *rrect;
@@ -73,14 +80,14 @@ void rectangle_collision_fight(plane_t *plane, size_t left, size_t right) {
     //TODO
     /* some genetic logic may be defined here
      * for now just kill smaller one */
-    size_t looser = (winner == lrect) ? right : left;
+    int looser = (winner == lrect) ? right : left;
 
     plane_remove_rectangle(plane, looser);
 
     return;
 }
 
-void action_nostim(plane_t *plane, size_t index) {
+void action_nostim(plane_t *plane, int index) {
     rectangle_t *rect = plane->rects[index];
     if (!rect) return;
     switch (rect->actions.nostim_o) {
@@ -98,7 +105,7 @@ void action_nostim(plane_t *plane, size_t index) {
     }
 }
 
-void action_food(plane_t *plane, size_t index) {
+void action_food(plane_t *plane, int index) {
     rectangle_t *rect = plane->rects[index];
     if (!rect) return;
     switch (rect->actions.food_o) {
@@ -122,7 +129,7 @@ void action_food(plane_t *plane, size_t index) {
     }
 }
 
-void action_big(plane_t *plane, size_t index) {
+void action_big(plane_t *plane, int index) {
     rectangle_t *rect = plane->rects[index];
     if (!rect) return;
     switch (rect->actions.food_o) {
@@ -146,7 +153,7 @@ void action_big(plane_t *plane, size_t index) {
     }
 }
 
-void action_prey(plane_t *plane, size_t index) {
+void action_prey(plane_t *plane, int index) {
     rectangle_t *rect = plane->rects[index];
     if (!rect) return;
     switch (rect->actions.food_o) {
@@ -169,7 +176,6 @@ void action_prey(plane_t *plane, size_t index) {
             exit (1);
     }
 }
-
 
 void rectangle_accelerate(rectangle_t *rect, double speed, double angle) {
     double time_needed = speed / rect->traits[ti_accel]; /* time in seconds to accelerate */
@@ -213,15 +219,15 @@ void rectangle_accelerate(rectangle_t *rect, double speed, double angle) {
     //FIXME no energy losses
 }
 
-void rectangle_TESTMOVE     (plane_t *plane, size_t index) { 
+void rectangle_TESTMOVE     (plane_t *plane, int index) { 
     //FIXME redirecting to move_random
     rectangle_move_random(plane, index);
     return;
 }
 
-void rectangle_hybernate    (plane_t *plane, size_t index) { rectangle_TESTMOVE(plane, index); }
+void rectangle_hybernate    (plane_t *plane, int index) { rectangle_TESTMOVE(plane, index); }
 
-void rectangle_move_random  (plane_t *plane, size_t index) { 
+void rectangle_move_random  (plane_t *plane, int index) { 
     rectangle_t *rect = plane->rects[index];
     //FIXME random angle 
     double angle = rect->angle;
@@ -234,9 +240,9 @@ void rectangle_move_random  (plane_t *plane, size_t index) {
     rectangle_accelerate(rect, 5, angle);
 }
 
-void rectangle_move_lrandom (plane_t *plane, size_t index) { rectangle_TESTMOVE(plane, index); }
-void rectangle_move_avoid   (plane_t *plane, size_t index) { rectangle_TESTMOVE(plane, index); }
-void rectangle_move_seek    (plane_t *plane, size_t index) { rectangle_TESTMOVE(plane, index); }
+void rectangle_move_lrandom (plane_t *plane, int index) { rectangle_TESTMOVE(plane, index); }
+void rectangle_move_avoid   (plane_t *plane, int index) { rectangle_TESTMOVE(plane, index); }
+void rectangle_move_seek    (plane_t *plane, int index) { rectangle_TESTMOVE(plane, index); }
 
 void timer_wait(struct timespec *start, long long nsecs) {
     struct timespec ts;
@@ -278,8 +284,8 @@ int timer_check(struct timespec *start, long long nsecs) {
 
 void frame_simulate(plane_t *plane) {
     timer_wait(&plane->ts_curr, TICK_NSEC);
-    size_t max = plane->rect_max;
-    size_t i;
+    int max = plane->rect_max;
+    int i;
     for (i = 0; i < max; i++) {
         if (!plane->rects[i]) continue;
         rectangle_act(plane, i);
@@ -287,8 +293,7 @@ void frame_simulate(plane_t *plane) {
     timer_reset(&plane->ts_curr);
 }
 
-
-enum actions rectangle_action_get(plane_t *plane, size_t index) {
+enum actions rectangle_action_get(plane_t *plane, int index) {
     rectangle_t *rect = plane->rects[index];
     int bigger_exists = false,
         target_exists = false;
@@ -302,7 +307,7 @@ enum actions rectangle_action_get(plane_t *plane, size_t index) {
     return a_no_stim;
 }
 
-void rectangle_act(plane_t *plane, size_t index) {
+void rectangle_act(plane_t *plane, int index) {
     enum actions action = rectangle_action_get(plane, index);
     rectangle_t *rect = plane->rects[index];
     /* update rectangle timers */
@@ -338,7 +343,7 @@ void rectangle_act(plane_t *plane, size_t index) {
     rect->prev_action = action;
 }
 
-int rectangle_borders_resolve(plane_t *plane, size_t index) {
+int rectangle_borders_resolve(plane_t *plane, int index) {
     //FIXME MOVE CODE
     rectangle_t *r = plane->rects[index];
     /* up */
@@ -372,7 +377,6 @@ int rectangle_borders_resolve(plane_t *plane, size_t index) {
     return 0;
 }
 
-
 static inline double col_il(rectangle_t *r, rectangle_t *t) {
     double xovershoot = r->x - t->y - t->width; //<0 checked
     r->xspeed = -r->xspeed;
@@ -388,7 +392,6 @@ static inline double col_ir(rectangle_t *r, rectangle_t *t) {
 
     return xovershoot;
 }
-
 
 static inline double col_iu(rectangle_t *r, rectangle_t *t) {
     double yovershoot = r->y - (t->y + t->height); //<0 checked
@@ -419,10 +422,10 @@ static inline void col_apply(rectangle_t *r, double *xovershoot, double *yoversh
 }
 
 /* lol clear bloat */
-void rectangle_collision_resolve(plane_t *plane, size_t index) {
+void rectangle_collision_resolve(plane_t *plane, int index) {
     if (!plane->rects[index]) return; /* rectangle was killed, exit recursion */
     int flag_collided;
-    size_t col_index = plane_check_collisions(plane, index, &flag_collided);
+    int col_index = plane_check_collisions(plane, index, &flag_collided);
     if (!flag_collided) { /* if no rect collision check borders */
         if(rectangle_borders_resolve(plane, index)) /* if changed go deeper */
             rectangle_collision_resolve(plane, index);
@@ -432,7 +435,6 @@ void rectangle_collision_resolve(plane_t *plane, size_t index) {
 
     /* rect collision happened, resolve by tunneling distance then go deeper */
     /* go deeper */
-    //FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME 
     rectangle_t *r = plane->rects[index];
     rectangle_t *t = plane->rects[col_index];
     /* i[udlrvh] flags indicate if intersection from [udlrvh] side is possible
@@ -513,7 +515,7 @@ void rectangle_collision_resolve(plane_t *plane, size_t index) {
     return;
 }
 
-void rectangle_simulate(plane_t *plane, size_t index) {
+void rectangle_simulate(plane_t *plane, int index) {
     rectangle_t *rect = plane->rects[index];
     double nx, ny;
     nx = rect->x + (rect->xspeed) * (double)((long double)TICK_NSEC/(long double)NSEC_IN_SEC);
@@ -538,6 +540,46 @@ rectangle_t *rectangle_compare(rectangle_t *left, rectangle_t *right) {
     return MAX(rsize, lsize) == rsize ? right : left;
 }
 
+//TODO clean
+/* writes rectangle text representation to buffer 
+ * returns buffer size or 0 on fail*/
+size_t rectangle_represent(rectangle_t *rect, char **buff) {
+    size_t size;
+    if (!rect) return 0;
+
+    FILE *mstream = open_memstream(buff, &size);
+
+    //always true ???
+    /*
+    if (errno != 0)
+        return 0;
+    */
+
+    if (!mstream) return 0;
+
+    fprintf(mstream, 
+        "Name: %s\nangle: %frad, y: %f, x: %f, height: %f, width: %f\nenrg: %f\n",
+        rect->name, 
+        rect->angle, rect->y, rect->x, rect->height, rect->width,
+        rect->energy
+    );
+
+    int i;
+    for (i = 0; i < TIE_NUMBER; i++) {
+        if (i + 1 != TIE_NUMBER) {
+            fprintf(mstream, "%-24s%f\n", 
+                trait_names[i], rect->traits[i]);
+        } else {
+            fprintf(mstream, "%-24s%f", 
+                trait_names[i], rect->traits[i]);
+        }
+    }
+
+    fclose(mstream);
+    return size;
+}
+
+
 double rectangle_size(rectangle_t *rect) { 
     return (double)(rect->width * rect->height);
 }
@@ -551,19 +593,20 @@ void _rectangle_init_randomly(plane_t *plane, rectangle_t *rect) {
     //TODO initialize actions randomly
 }
 
-void  plane_init(plane_t *plane, rectangle_t **rects, size_t recs_size) {
-    plane->rects = calloc(sizeof(rectangle_t*), recs_size);
-    plane->rect_max = recs_size;
+void  plane_init(plane_t *plane, rectangle_t **rects, int rects_number) {
+    if (rects_number < 0) rects_number = 0;
+    plane->rects = calloc(sizeof(rectangle_t*), (size_t)rects_number);
+    plane->rect_max = rects_number;
     timer_reset(&plane->ts_init);
     timer_reset(&plane->ts_curr);
     if (!rects){
         /* no rects given, therefore create them accordingly to config globals
-         * TODO kill intersecting ones*/
-        size_t i;
-        for (i = 0; i < recs_size; i++) {
+         * TODO kill intersecting ones */
+        int i;
+        for (i = 0; i < rects_number; i++) {
             rectangle_t *rect = plane->rects[i] = rectangle_create();
             _rectangle_init_randomly(plane, rect);
-            size_t j = 0;
+            int j = 0;
             int flag_collided = false;
             while (j++ < RECTANGLE_INIT_MAX_RETRIES) { 
                 plane_check_collisions(plane, i, &flag_collided);
@@ -587,7 +630,7 @@ plane_t *plane_create(double xsize, double ysize) {
 
 void plane_destroy(plane_t *plane) {
     if (!plane) return;
-    size_t i, max;
+    int i, max;
     max = plane->rect_max;
     rectangle_t **rects = plane->rects;
     for(i = 0; i < max; i++) {
@@ -602,10 +645,10 @@ void plane_destroy(plane_t *plane) {
 /* Checks for collisions for rectangle of given index 
  * WARN assumes that index is valid 
  * this function does not check for NULL rectangles at index 
- * return size_t index of collision rectangle
+ * return int index of collision rectangle
  * if collision happed set flag to true if not, false and return 0 */
-size_t plane_check_collisions(plane_t *plane, size_t index, int *flag_collided) {
-    size_t i;
+int plane_check_collisions(plane_t *plane, int index, int *flag_collided) {
+    int i;
     rectangle_t *rect = plane->rects[index];
     for (i = 0; i < plane->rect_max; i++) {
         rectangle_t *curr = plane->rects[i];
@@ -652,12 +695,12 @@ int rectangle_check_collision(rectangle_t *l, rectangle_t *r) {
 
 
 /* properly removes rectangle and destroys it */
-void plane_remove_rectangle(plane_t *plane, size_t index) {
+void plane_remove_rectangle(plane_t *plane, int index) {
     free(plane->rects[index]);
     plane->rects[index] = NULL;
 }
-size_t plane_get_proximate_rectangle(plane_t *plane, size_t index, double mindist, enum size_diff_e type, int *flagExists) {
-    size_t i, max;
+int plane_get_proximate_rectangle(plane_t *plane, int index, double mindist, enum size_diff_e type, int *flagExists) {
+    int i, max;
     rectangle_t *rect = plane->rects[index];
     max = plane->rect_max;
     for (i = 0; i < max; i++) {
@@ -699,7 +742,7 @@ double rectangle_distance(rectangle_t *left, rectangle_t *right) {
     return sqrt(dcx*dcx + dcy*dcy);
 }
 
-int plane_is_rect_alive(plane_t *plane, size_t index) {
+int plane_is_rect_alive(plane_t *plane, int index) {
     if (index < 0) return false;
     if (index > plane->rect_max) return false;
     return plane->rects[index] != NULL;

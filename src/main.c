@@ -7,21 +7,21 @@
 
 int main(){
     srand((unsigned int)time(NULL));
-    render_state_t *state = render_init();
+    render_init();
 
-    plane_t *plane = plane_create(state->canv_maxx+1, state->canv_maxy+1);
+    plane_t *plane = plane_create(rstate->canv_maxx+1, rstate->canv_maxy+1);
     plane_init(plane, NULL, 10);
-    render_load(state, plane);
-    render_greeting(state);
+    render_load(plane);
+    render_greeting();
     
     while (true) {
-        control_cycle(state);
-        frame_simulate(state->plane);
-        render_frame(state);
+        control_cycle();
+        frame_simulate(rstate->plane);
+        render_frame();
     }
 
     /* TODO write user interface and exit/reload plane on wgetch 
-    render_exit(state);
+    render_exit();
     */
     return 0;
 }
