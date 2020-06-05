@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <ctype.h>
 
 const char *trait_names[] = {
     "movement speed", "acceleration", "seconds to idle",
@@ -10,6 +11,75 @@ const char *trait_names[] = {
     "pursue distance", "pursue speed", "food detection distance",
     "food pursue speed",
 "traits number" };
+
+void rectangle_random_name(rectangle_t *rect) {
+    int bufsize = sizeof(rect->name);
+    char is_consonant[bufsize];
+    int i;
+    char consonants[] = "rtpsdfghklxcvbnm";
+    char sonants[] = "eyuioa";
+
+    int consize = sizeof(consonants) - 1;
+    int sonsize = sizeof(sonants) - 1;
+
+    int min_len = 3;
+    int max_seq_consonants = 2;
+    int max_seq_sonants = 2;
+    int percent_sonant = 35;
+    int term_percent = 35;  /*at every char*/
+
+    for (i = 0; i < bufsize - 1; i++) {
+        if (i > min_len  && (rand() % 100 < term_percent) ) {
+            rect->name[i] = '\0';
+            break;
+        }
+
+        if (i >= max_seq_sonants) {
+            int j;
+            int force_consonant = 1;
+            for (j = 1; j <= max_seq_sonants; j++) {
+                if (is_consonant[i-j]) {
+                    force_consonant = 0;
+                    break;
+                }
+            }
+
+            if (force_consonant) {
+                is_consonant[i] = 1;
+                rect->name[i] = consonants[rand() % consize];
+                continue;
+            }
+        }
+
+        if (i >= max_seq_consonants) {
+            int j;
+            int force_sonant = 1;
+            for (j = 1; j <= max_seq_consonants; j++) {
+                if (!is_consonant[i-j]) {
+                    force_sonant = 0;
+                    break;
+                }
+            }
+
+            if (force_sonant) {
+                is_consonant[i] = 0;
+                rect->name[i] = sonants[rand() % sonsize];
+                continue;
+            }
+        }
+
+        if (rand() % 100 < percent_sonant) {
+            is_consonant[i] = 0;
+            rect->name[i] = sonants[rand() % sonsize];
+        } else {
+            is_consonant[i] = 1;
+            rect->name[i] = consonants[rand() % consize];
+        }
+    }
+
+    rect->name[0] = (char)toupper(rect->name[0]);
+    rect->name[bufsize - 1] = '\0';
+}
 
 void rectangle_default_traits(rectangle_t *rect){
     rect->traits[ti_mspeed          ] = DEFAULT_MSPEED;
@@ -33,6 +103,7 @@ rectangle_t *rectangle_create() {
     rect->actions.prey_o    = RANDOM_PREY; 
     
     rectangle_default_traits(rect);
+    rectangle_random_name(rect);
     return rect;
 }
 
@@ -340,7 +411,7 @@ void rectangle_act(plane_t *plane, int index) {
             break;
     }
     rectangle_simulate(plane, index);
-    rect->prev_action = action;
+    if (plane->rects[index]) rect->prev_action = action;
 }
 
 int rectangle_borders_resolve(plane_t *plane, int index) {
@@ -584,6 +655,7 @@ double rectangle_size(rectangle_t *rect) {
     return (double)(rect->width * rect->height);
 }
 
+/* initialize rectangle_t rect fields with random values*/
 void _rectangle_init_randomly(plane_t *plane, rectangle_t *rect) {
     rect->width     = rand() % (WIDTH_INIT_MAX - WIDTH_INIT_MIN + 1) + WIDTH_INIT_MIN;
     rect->height    = rand() % (HEIGHT_INIT_MAX - HEIGHT_INIT_MIN + 1) + HEIGHT_INIT_MIN;
@@ -593,15 +665,16 @@ void _rectangle_init_randomly(plane_t *plane, rectangle_t *rect) {
     //TODO initialize actions randomly
 }
 
+/* **rects pointer for copying them from existing plane */
 void  plane_init(plane_t *plane, rectangle_t **rects, int rects_number) {
     if (rects_number < 0) rects_number = 0;
     plane->rects = calloc(sizeof(rectangle_t*), (size_t)rects_number);
     plane->rect_max = rects_number;
+    plane->rect_alive = rects_number;
     timer_reset(&plane->ts_init);
     timer_reset(&plane->ts_curr);
+    /* if no rects given create them*/
     if (!rects){
-        /* no rects given, therefore create them accordingly to config globals
-         * TODO kill intersecting ones */
         int i;
         for (i = 0; i < rects_number; i++) {
             rectangle_t *rect = plane->rects[i] = rectangle_create();
@@ -612,6 +685,9 @@ void  plane_init(plane_t *plane, rectangle_t **rects, int rects_number) {
                 plane_check_collisions(plane, i, &flag_collided);
                 if (!flag_collided) break;
                 _rectangle_init_randomly(plane, rect);        
+            }
+            if (j == RECTANGLE_INIT_MAX_RETRIES) {
+                plane_remove_rectangle(plane, i);
             }
         }
         /* TODO beter initialization*/
@@ -633,11 +709,13 @@ void plane_destroy(plane_t *plane) {
     int i, max;
     max = plane->rect_max;
     rectangle_t **rects = plane->rects;
-    for(i = 0; i < max; i++) {
-        if (!rects[i]) continue;
-        rectangle_destroy(rects[i]);
+    if (rects) {
+        for(i = 0; i < max; i++) {
+            if (!rects[i]) continue;
+            rectangle_destroy(rects[i]);
+        }
+        free(rects);
     }
-    free(rects);
     free(plane);
 }
 
@@ -696,8 +774,10 @@ int rectangle_check_collision(rectangle_t *l, rectangle_t *r) {
 
 /* properly removes rectangle and destroys it */
 void plane_remove_rectangle(plane_t *plane, int index) {
+    if (!plane->rects[index]) return;
     free(plane->rects[index]);
     plane->rects[index] = NULL;
+    plane->rect_alive--;
 }
 int plane_get_proximate_rectangle(plane_t *plane, int index, double mindist, enum size_diff_e type, int *flagExists) {
     int i, max;

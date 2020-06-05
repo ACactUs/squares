@@ -1,6 +1,7 @@
 #include "render.h"
 #include "logic.h"
 //#include "logic.h"
+#include <stdint.h>
 #include <stdio.h>
 #include <time.h>
 #include <curses.h>
@@ -66,29 +67,30 @@ void render_rectangle(int index) {
         return;
     }
 
-    //FIXME dont update for each rect
     werase(win);
-    //wrefresh(win);
     
     int lines, cols;
+    int by, bx;
+    bx = (int)(rect->x * rstate->char_htw);
+    by = (int)(rect->y);
     lines = (int)(rect->height); 
-    cols  = (int)(rect->width);
+    cols  = (int)(rect->width * rstate->char_htw); //TODO wth
     if (lines < 1) lines = 1;
     if (cols  < 1) cols  = 1;
 
-    int mresp = mvwin(win, (int)rect->y, (int)rect->x);
+    int mresp = mvwin(win, by, bx);
     int rresp = wresize(win, lines, cols);
 
-    int m_len = 5;
+    size_t m_len = 8;
     char message[m_len];
-    snprintf(message, (size_t)m_len, "%d", index);
+    snprintf(message, m_len, "%.5s", rect->name);
     mvwprintw(win, 1, 1, message);
 
 
     /* resize rect win to (1,1) and retry */
     if ((ERR == mresp) | (ERR == rresp)) {
         wresize(win, 1, 1);
-        mresp = mvwin(win, (int)rect->y, (int)rect->x);
+        mresp = mvwin(win, (int)rect->y, (int)rect->x); //FIXME old code
         rresp = wresize(win, lines, cols);
         if ((ERR == mresp) | (ERR == rresp)) {
             render_status("ERR: could not move window, render canceled... press any key");
@@ -102,6 +104,9 @@ void render_rectangle(int index) {
     }
     
     box(win, 0, 0);
+
+    snprintf(message, m_len, "%d", index);
+    mvwprintw(win, 0, 0, message);
     wnoutrefresh(win);
 }
 
@@ -118,10 +123,10 @@ void render_load(plane_t *plane) {
         if (!rect) continue;
 
         int lines, cols, by, bx;
-        lines = (int)rect->height;
-        cols  = (int)rect->width;
-        by    = (int)rect->y;
-        bx    = (int)rect->x;
+        lines = (int)(rect->height);
+        cols  = (int)(rect->width);
+        by    = (int)(rect->y);
+        bx    = (int)(rect->x);
         if (lines < 1 ) lines = 1;
         if (cols < 1 ) lines = 1;
         rstate->rect_wins[i] = newwin(lines, cols, by, bx);
@@ -151,7 +156,7 @@ void render_init() {
     cbreak();
     
     /* TODO support colorless terms */
-    if (!has_colors() || !can_change_color() ) {
+    if (!has_colors() /*|| !can_change_color() */) {
         fprintf(stderr, "Sorry, your terminal does not support color changing\n");
         render_exit();
         
@@ -164,6 +169,7 @@ void render_init() {
     //init_pair(cp_bw, -1, COLOR_WHITE);
 
     getmaxyx(stdscr, rstate->maxy, rstate->maxx);
+    rstate->char_htw = DEFAULT_CHAR_HTW;
     rstate->canv_maxx = rstate->maxx;
     rstate->canv_maxy = rstate->maxy - 1;
     rstate->status = newwin(1, rstate->maxx, rstate->maxy-1, 0);
@@ -191,10 +197,12 @@ void render_clear_status() {
 }
 
 void render_exit() {
-    plane_destroy(rstate->plane);
+    plane_t *plane = rstate->plane;
     render_unload();
+    plane_destroy(plane);
     free(rstate);
     endwin();
+
     exit(0);
 }
 
@@ -216,7 +224,7 @@ int calculate_height(char *message, int width) {
             lens[i] = (int)len;
             break;
         } else if (*nl_ptr == '\n') {
-            int len = (nl_ptr - start_ptr);
+            int len = (int)(nl_ptr - start_ptr);
             lens[i] = len;
             start_ptr = nl_ptr + 1;
             continue;
@@ -361,6 +369,7 @@ void ckey_p() {
     if (bufsize == 0) return;
 
     render_popup_getch(message);
+    free(message);
 }
 
 /* move left corner */
@@ -425,8 +434,9 @@ int ckey_r() {
         render_unload();
         plane_destroy(p);
 
-        /* TODO ask user to fill fields*/
-        p = plane_create(rstate->canv_maxx+1, rstate->canv_maxy+1);
+        /* TODO ask user to fill fields 
+         * TODO create plane from rstate as new funct */
+        p = plane_create((rstate->canv_maxx+1) / rstate->char_htw, rstate->canv_maxy+1);
         plane_init(p, NULL, 10);
         render_load(p);
         return false;

@@ -9,7 +9,8 @@ int main(){
     srand((unsigned int)time(NULL));
     render_init();
 
-    plane_t *plane = plane_create(rstate->canv_maxx+1, rstate->canv_maxy+1);
+    plane_t *plane = plane_create( (rstate->canv_maxx+1) / rstate->char_htw, 
+        rstate->canv_maxy+1);
     plane_init(plane, NULL, 10);
     render_load(plane);
     render_greeting();

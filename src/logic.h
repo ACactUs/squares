@@ -9,9 +9,9 @@
 
 /*CONFIG*/
 #define SIZE_DIFF_TRESHOLD          1.2f        /* rect must be ... times bigger in order to eat another rect*/
-#define WIDTH_INIT_MIN              4           /* rectangle size at start will be between MIN and MAX*/
+#define WIDTH_INIT_MIN              10           /* rectangle size at start will be between MIN and MAX*/
 #define WIDTH_INIT_MAX              10
-#define HEIGHT_INIT_MIN             4           
+#define HEIGHT_INIT_MIN             10           
 #define HEIGHT_INIT_MAX             10          
 #define SPEED_INIT_MAX              4           /* at game start rectangle speed is not higher than this*/
 #define SPEED_ABS_MAX               15          /* highest possible speed*/

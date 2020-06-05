@@ -3,8 +3,16 @@
 #include "logic.h"
 #include <errno.h>
 
-#define RENDER_NSEC 33333333LL             /*60fps 16666666LL; 30fps 33333333LL*/
-#define INPUT_NSEC  16666666LL             /*60fps 16666666LL; 30fps 33333333LL*/
+/* VERY IMPORTANT: ncurses cant get char aspect ratio on a real screen,
+ * it can retrieve width and height of screen in characters
+ * this constant is terminal-dependent and should be set by user
+ * if this is set improperly, rectangles will have inaccurate aspect ratio,
+ * i.e. 10*10 rectangle wont be rendered as square
+ * this only affects rendering, not physics*/
+#define DEFAULT_CHAR_HTW    2.0             /*char height / width in pixel on screen*/
+
+#define RENDER_NSEC         33333333LL      /*60fps 16666666LL; 30fps 33333333LL*/
+#define INPUT_NSEC          16666666LL      /*60fps 16666666LL; 30fps 33333333LL*/
 
 enum zoom       { zo_none };
 enum color_pairs{ cp_wb=1, cp_bw };
@@ -12,6 +20,7 @@ enum color_pairs{ cp_wb=1, cp_bw };
 typedef struct {
    enum zoom zoom;          /*selected zoom level*/
    int  maxx, maxy;         /*terminal window size*/
+   double char_htw;         /*terminal width to height ration*/
    int canv_maxx, canv_maxy;/*size of window where rectangles will be rendered*/
    plane_t *plane;      
    WINDOW *status;          /*statusbar window*/
