@@ -11,14 +11,17 @@ int main(){
 
     plane_t *plane = plane_create( (rstate->canv_maxx+1) / rstate->char_htw, 
         rstate->canv_maxy+1);
-    plane_init(plane, NULL, 10);
+    plane_init(plane, NULL, 25);
     render_load(plane);
     render_greeting();
+    time_begin();
     
     while (true) {
+        time_start_logic();
         control_cycle();
         frame_simulate(rstate->plane);
         render_frame();
+        time_next();
     }
 
     /* TODO write user interface and exit/reload plane on wgetch 

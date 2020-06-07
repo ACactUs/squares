@@ -18,23 +18,29 @@ enum zoom       { zo_none };
 enum color_pairs{ cp_wb=1, cp_bw };
 
 typedef struct {
-   enum zoom zoom;          /*selected zoom level*/
-   int  maxx, maxy;         /*terminal window size*/
-   double char_htw;         /*terminal width to height ration*/
-   int canv_maxx, canv_maxy;/*size of window where rectangles will be rendered*/
-   plane_t *plane;      
-   WINDOW *status;          /*statusbar window*/
-   WINDOW *canvas;          /*window which holds rectangles*/
-   WINDOW **rect_wins;/* windows are used to render rectangles so
-                      * win_rect_alive is an array of windows or NULLs, where
-                      * living rectangles have same index plane_t->rect_array
-                      * as their windows in render_state_t->rect_wins 
-                      * if rectangle is dead then corresponding index in plane_t and
-                      * in render_state_t point to NULL element*/
-   struct timespec ts_last_render;
-   struct timespec ts_last_input;
-   struct timespec ts_init;
+    enum zoom zoom;          /*selected zoom level*/
+    int  maxx, maxy;         /*terminal window size*/
+    double char_htw;         /*terminal width to height ration*/
+    int canv_maxx, canv_maxy;/*size of window where rectangles will be rendered*/
+    plane_t *plane;      
+    WINDOW *status;          /*statusbar window*/
+    WINDOW *canvas;          /*window which holds rectangles*/
+    WINDOW **rect_wins;  
+    /* windows are used to render rectangles so
+     * win_rect_alive is an array of windows or NULLs, where
+     * living rectangles have same index plane_t->rect_array                                
+     * as their windows in render_state_t->rect_wins                                        
+     * if rectangle is dead then corresponding index in plane_t and                         
+     * in render_state_t point to NULL element*/                                            
+    struct timespec ts_last_render;
+    struct timespec ts_last_input;
+    struct timespec ts_init;
 } render_state_t;
+
+struct popup_state {
+    WINDOW *box;
+    WINDOW *popup;
+};
 
 extern render_state_t *rstate;
 

@@ -4,6 +4,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <ctype.h>
+#include <string.h>
+#include <time.h>
+
+struct global_time GLOBAL_TIME;
 
 const char *trait_names[] = {
     "movement speed", "acceleration", "seconds to idle",
@@ -12,11 +16,21 @@ const char *trait_names[] = {
     "food pursue speed",
 "traits number" };
 
+const char* action_slots_names[] = { 
+    "no stim", "food", "run", "hunt" 
+}; 
+
+const char *funames_no_stim  [] = { "idle", "move random", "long random move" };
+const char *funames_food     [] = { "idle", "move random", "long random move", "avoid", "seek" };
+const char *funames_big      [] = { "idle", "move random", "long random move", "avoid", "seek" };
+const char *funames_prey     [] = { "idle", "move random", "long random move", "avoid", "seek" };
+const char **funames         [] = { funames_no_stim, funames_food, funames_big, funames_prey };
+
 void rectangle_random_name(rectangle_t *rect) {
     int bufsize = sizeof(rect->name);
     char is_consonant[bufsize];
     int i;
-    char consonants[] = "rtpsdfghklxcvbnm";
+    char consonants[] = "rtpsdfghklcvbnm";
     char sonants[] = "eyuioa";
 
     int consize = sizeof(consonants) - 1;
@@ -301,6 +315,7 @@ void rectangle_hybernate    (plane_t *plane, int index) { rectangle_TESTMOVE(pla
 void rectangle_move_random  (plane_t *plane, int index) { 
     rectangle_t *rect = plane->rects[index];
     //FIXME random angle 
+    //FIXME move speed
     double angle = rect->angle;
     if (rect->secs_timer >= rect->traits[ti_mrandom_delay]) {
         angle = ((double)rand() / RAND_MAX) * 2 * M_PI;
@@ -308,21 +323,26 @@ void rectangle_move_random  (plane_t *plane, int index) {
         rect->angle = angle;
     }
 
-    rectangle_accelerate(rect, 5, angle);
+    double speed = rect->traits[ti_mspeed];
+    /* FIXME traits must be kept up to date by another function
+     * it must be called on initialize or traits change */
+    //if (speed > SPEED_ABS_MAX) speed = SPEED_ABS_MAX;
+    rectangle_accelerate(rect, speed, angle);
 }
 
 void rectangle_move_lrandom (plane_t *plane, int index) { rectangle_TESTMOVE(plane, index); }
 void rectangle_move_avoid   (plane_t *plane, int index) { rectangle_TESTMOVE(plane, index); }
 void rectangle_move_seek    (plane_t *plane, int index) { rectangle_TESTMOVE(plane, index); }
 
+/* FIXME deprecated */
 void timer_wait(struct timespec *start, long long nsecs) {
     struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
+    clock_gettime(CLOCK_REALTIME, &ts);
     long long nsec_elapsed = (ts.tv_sec - start->tv_sec) * NSEC_IN_SEC
                                     + ts.tv_nsec - start->tv_nsec;
 
     if (nsec_elapsed < nsecs) {
-        //clock_gettime(CLOCK_MONOTONIC, &start);
+        //clock_gettime(CLOCK_REALTIME, &start);
         long long wait_nsec = nsecs - nsec_elapsed;
         ts.tv_sec  = 0;
         while (wait_nsec >= NSEC_IN_SEC) {
@@ -335,7 +355,7 @@ void timer_wait(struct timespec *start, long long nsecs) {
 }
 
 void timer_reset(struct timespec *start) {
-    clock_gettime(CLOCK_MONOTONIC, start);
+    clock_gettime(CLOCK_REALTIME, start);
 }
 
 void timer_waitreset(struct timespec *start, long long nsecs) {
@@ -345,7 +365,7 @@ void timer_waitreset(struct timespec *start, long long nsecs) {
 
 int timer_check(struct timespec *start, long long nsecs) {
     struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
+    clock_gettime(CLOCK_REALTIME, &ts);
     long long nsec_elapsed = (ts.tv_sec - start->tv_sec) * NSEC_IN_SEC
                                     + ts.tv_nsec - start->tv_nsec;
 
@@ -353,15 +373,54 @@ int timer_check(struct timespec *start, long long nsecs) {
     return (nsec_elapsed < nsecs);
 }
 
+void time_begin() {
+    timer_reset(&GLOBAL_TIME.start_time);
+    GLOBAL_TIME.lost_time.tv_sec  = 0;
+    GLOBAL_TIME.lost_time.tv_nsec = 0;
+}
+
+void time_start_logic() {
+    timer_reset(&GLOBAL_TIME.tick_start);
+}
+
+void time_next() {
+    struct timespec ts;
+    long long nsecs;
+
+    clock_gettime(CLOCK_REALTIME, &ts);
+
+    /* elapsed time */
+    nsecs = 0;
+    ts.tv_sec -= GLOBAL_TIME.tick_start.tv_sec;
+    nsecs += ts.tv_sec * NSEC_IN_SEC;
+    nsecs += ts.tv_nsec - GLOBAL_TIME.tick_start.tv_nsec;
+
+    /* tick took longer than TICK_NSEC */
+    if (nsecs >= TICK_NSEC) {
+        GLOBAL_TIME.lost_time.tv_sec += nsecs / NSEC_IN_SEC;
+        GLOBAL_TIME.lost_time.tv_nsec += nsecs % NSEC_IN_SEC;
+        if (GLOBAL_TIME.lost_time.tv_nsec >= NSEC_IN_SEC) {
+            GLOBAL_TIME.lost_time.tv_sec++;
+            GLOBAL_TIME.lost_time.tv_nsec -= NSEC_IN_SEC;
+        }
+        return;
+    }
+
+    nsecs = TICK_NSEC - nsecs;
+
+    ts.tv_sec  = nsecs / NSEC_IN_SEC;
+    ts.tv_nsec = nsecs % NSEC_IN_SEC;
+
+    nanosleep(&ts, NULL);
+}
+
 void frame_simulate(plane_t *plane) {
-    timer_wait(&plane->ts_curr, TICK_NSEC);
     int max = plane->rect_max;
     int i;
     for (i = 0; i < max; i++) {
         if (!plane->rects[i]) continue;
         rectangle_act(plane, i);
     }
-    timer_reset(&plane->ts_curr);
 }
 
 enum actions rectangle_action_get(plane_t *plane, int index) {
@@ -493,6 +552,7 @@ static inline void col_apply(rectangle_t *r, double *xovershoot, double *yoversh
 }
 
 /* lol clear bloat */
+/*if rectangle gets teleported out of plane, program crashes*/
 void rectangle_collision_resolve(plane_t *plane, int index) {
     if (!plane->rects[index]) return; /* rectangle was killed, exit recursion */
     int flag_collided;
@@ -613,7 +673,8 @@ rectangle_t *rectangle_compare(rectangle_t *left, rectangle_t *right) {
 
 //TODO clean
 /* writes rectangle text representation to buffer 
- * returns buffer size or 0 on fail*/
+ * returns buffer size or 0 on fail
+ * size does NOT include \0 */
 size_t rectangle_represent(rectangle_t *rect, char **buff) {
     size_t size;
     if (!rect) return 0;
@@ -636,14 +697,21 @@ size_t rectangle_represent(rectangle_t *rect, char **buff) {
     );
 
     int i;
+
+    
+    /* print each action slot and its function */
+    /*
+    for (i = 0; i < A_NUMBER; i++) {
+        fprintf(mstream, "%d:%-19s %s\n", 
+            i, action_slot_names[i], funames[i][rect->actions[i]]);
+    }
+    */
+
+    /* print traits */
     for (i = 0; i < TIE_NUMBER; i++) {
-        if (i + 1 != TIE_NUMBER) {
-            fprintf(mstream, "%-24s%f\n", 
-                trait_names[i], rect->traits[i]);
-        } else {
-            fprintf(mstream, "%-24s%f", 
-                trait_names[i], rect->traits[i]);
-        }
+        fprintf(mstream, "%d:%-23s %f", 
+            i, trait_names[i], rect->traits[i]);
+        if (i + 1 != TIE_NUMBER) fprintf(mstream, "\n");
     }
 
     fclose(mstream);
@@ -672,7 +740,6 @@ void  plane_init(plane_t *plane, rectangle_t **rects, int rects_number) {
     plane->rect_max = rects_number;
     plane->rect_alive = rects_number;
     timer_reset(&plane->ts_init);
-    timer_reset(&plane->ts_curr);
     /* if no rects given create them*/
     if (!rects){
         int i;
@@ -724,7 +791,10 @@ void plane_destroy(plane_t *plane) {
  * WARN assumes that index is valid 
  * this function does not check for NULL rectangles at index 
  * return int index of collision rectangle
- * if collision happed set flag to true if not, false and return 0 */
+ * if collision happed set flag to true if not, false and return 0
+ * FIXME complexity O(N) for each rectangle, O(N**2) per tick
+ * FIXME flag_collided is no more needed because function now returns int and I can now return -1 if no collision happened 
+ * TODO keep rectangles in tree data structure or divide planes into sectors */
 int plane_check_collisions(plane_t *plane, int index, int *flag_collided) {
     int i;
     rectangle_t *rect = plane->rects[index];
@@ -740,35 +810,21 @@ int plane_check_collisions(plane_t *plane, int index, int *flag_collided) {
     return 0;
 }
 
-/*WARN function assumes that left and right exist and were initialized correctly*/
+/* WARN function assumes that left and right exist and were initialized correctly*/
 int rectangle_check_collision(rectangle_t *l, rectangle_t *r) {
     /*TODO return enum of collision direction instead*/
     int iu, id, il, ir, iv, ih;
     iu = l->y >= r->y && l->y <= r->y + r->height;
     id = l->y + l->height >= r->y && l->y + l->height <= r->y + r->height;
+    iv = (id) || (l->y <= r->y && l->y + l->height >= r->y + r->height) || (iu);
+    if (!iv) return 0;
+
     il = l->x >= r->x && l->x <= r->x + r->width;
     ir = l->x + l->width >= r->x && l->x + l->width <= r->x + r->width;
-
-    iv = (id) || (l->y <= r->y && l->y + l->height >= r->y + r->height) || (iu);
     ih = (il) || (l->x <= r->x && l->x + l->width >= r->x + r->width)   || (ir);
+    if (!ih) return 0;
 
-    return (iv && ih);
-
-    /*
-    if (right->x > left->x && right->x < left->x + left->width){
-        if (right->y > left->y && right->y < left->y + left->height)
-            return 1;
-        if (right->y + right->height > left->y && right->y + right->height < left->y + left->height)
-            return 1;
-    }
-    if (right->x + right->width > left->x && right->x + right->width < left->x + left->width) {
-        if(right->y > left->y && right->y < left->y + left->height)
-            return 1;
-        if(right->y + right->height > left->y && right->y + right->height < left->y + left->height)
-            return 1;
-    }
-    return 0;
-    */
+    return 1;
 }
 
 

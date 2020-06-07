@@ -187,12 +187,11 @@ void render_status(char *message) {
     render_clear_status();
     mvwprintw(rstate->status, 0, 0, message);
     
-    //FIXME
     wrefresh(rstate->status);
 }
 
 void render_clear_status() {
-    wclear(rstate->status);
+    werase(rstate->status);
     wrefresh(rstate->status);
 }
 
@@ -246,38 +245,58 @@ int calculate_height(char *message, int width) {
     return height;
 }
 
-int render_popup_getch(char *message) {
+void popup_clean(struct popup_state p) {
+    if (p.box) delwin(p.box);
+    if (p.popup) delwin(p.popup);
+}
+
+struct popup_state render_popup(char *message) {
+    struct popup_state p;
+    p.box = NULL;
+    p.popup = NULL;
+
     int width  = (int)(rstate->maxx * 0.6);
     int height = calculate_height(message, width);
 
-    if (height == -1) return 0;
+    if (height == -1) return p;
 
     int x0 = (rstate->maxx - width)/2;
     int y0 = (rstate->maxy - height)/2;
 
-    WINDOW *box = newwin(height+2, width+2, y0-1, x0-1);
-    box(box, 0, 0);
-    wrefresh(box);
+    p.box = newwin(height+2, width+2, y0-1, x0-1);
+    box(p.box, 0, 0);
+    wrefresh(p.box);
 
-    WINDOW *popup = newwin(height, width, y0, x0);
-    wprintw(popup, message);
-    wrefresh(popup);
+    p.popup = newwin(height, width, y0, x0);
+    wprintw(p.popup, message);
+    wrefresh(p.popup);
 
-    nodelay(popup, false);
-    int key = wgetch(popup);
+    return p;
+}
 
-    delwin(box);
-    delwin(popup);
+int render_popup_getch(char *message) {
+    struct popup_state p;
+    p = render_popup(message);
+    if (!p.box || !p.popup) return 0;
+
+    nodelay(p.popup, false);
+    int key = wgetch(p.popup);
+
+    popup_clean(p);
 
     return key;
 }
 
 /* returns 1 on success, writes int to res address */
-int input_int(int *res) {
+int input_int(char *prompt, int *res) {
     WINDOW *win = rstate->status;
+    if (!win) return 0;
+
     int was_nodelay = is_nodelay(win);
     nodelay(win, false);
     echo();
+
+    if (prompt) render_status(prompt);
 
     char input[16];
     int ret = wgetnstr(win, input, sizeof(input) - 1);
@@ -295,38 +314,52 @@ char *input_string(char *prompt) {
     int was_nodelay = is_nodelay(win);
     nodelay(win, false);
     echo();
+
+    render_status(prompt);
     int i_size = 128;
     char *input = calloc(sizeof(char), (size_t)i_size);
-    mvwprintw(win, 0, 0, prompt);
+
     wgetnstr(win, input, i_size);
 
     if (was_nodelay) nodelay(win, true);
     return input;
 }
 
+int input_double(char *message, double *a) {
+    double x;
+    char *input = input_string(message);
+    int nscaned = sscanf(input, "%lf", &x);
+    free(input);
+
+    if (nscaned != 1) {
+        render_status("Input failed");
+        return 0;
+    }
+
+    *a = x;
+    return 1;
+}
+
 /* returns 0 on success */
 int input_2doubles(char *message, double *a, double *b) {
-    float x, y;
+    double x, y;
     char *input = input_string(message);
-    int nscaned = sscanf(input, "%f %f", &x, &y);
+    int nscaned = sscanf(input, "%lf %lf", &x, &y);
     free(input);
 
     if (nscaned != 2) {
         render_status("Input failed");
-        return -1;
+        return 0;
     }
 
     *a = x;
     *b = y;
-
-    return 0;
+    return 1;
 }
 
 int input_select_rect(char *prompt) {
-    if (prompt) render_status(prompt);
-
     int target;
-    int is_success = input_int(&target);
+    int is_success = input_int(prompt, &target);
     noecho();
 
     if (is_success) {
@@ -379,9 +412,9 @@ void ckey_e1(int target) {
     snprintf(msg, 64, "(x=%f, y=%f)Enter new [x y]: ", rect->x, rect->y);
 
     double x, y;
-    int ret = input_2doubles(msg, &x, &y);
+    int is_ok = input_2doubles(msg, &x, &y);
 
-    if (ret != 0) return;
+    if (!is_ok) return;
 
     if (x < 0 || y < 0 || 
         x + rect->width > rstate->plane->xsize || 
@@ -394,8 +427,53 @@ void ckey_e1(int target) {
     }
 }
 
-/* resize */
-void ckey_e2(int target) {
+/*action*/
+void ckey_e4(int target) {
+    struct popup_state p;
+    rectangle_t *rect;
+
+    //TODO
+
+    rect = rstate->plane->rects[target];
+}
+
+/*traits*/
+void ckey_e5(int target) {
+    rectangle_t *rect;
+    int traitnum, is_ok;
+    struct popup_state p;
+    size_t rsize;
+    char *rrepr;
+    rect = rstate->plane->rects[target];
+
+    rsize = rectangle_represent(rect, &rrepr);
+    if (!rsize) return;
+
+    p = render_popup(rrepr);
+    free(rrepr);
+    if (!p.box || !p.popup) return;
+
+    is_ok = input_int("Select trait: ", &traitnum);
+    if (!is_ok) {
+        popup_clean(p);
+        return;
+    }
+
+    if (traitnum < 0 || traitnum >= TIE_NUMBER) {
+        popup_clean(p);
+        render_status("Invalid trait");
+        return;
+    }
+
+    double val;
+    is_ok = input_double("New value: ", &val);
+    if (!is_ok) {
+        popup_clean(p);
+        return;
+    }
+
+    rect = rstate->plane->rects[target];
+    rect->traits[traitnum] = val;
 }
 
 void ckey_emenu(int target, int key) {
@@ -405,9 +483,13 @@ void ckey_emenu(int target, int key) {
             break;
         case '2':
         case '3':
-        case '4':
-        case '5':
             render_popup_getch("Not implemented");
+            break;
+        case '4':
+            ckey_e4(target);
+            break;
+        case '5':
+            ckey_e5(target);
             break;
     }
 }
@@ -425,6 +507,28 @@ void ckey_e() {
     int key = render_popup_getch(message);
     render_frame();
     ckey_emenu(target, key);
+}
+
+void ckey_s() {
+    size_t mlen = 256;
+    char message[mlen];
+
+    int alive = rstate->plane->rect_alive;
+    int dead = rstate->plane->rect_max - alive;
+
+    long time, lostsec, lostnsec;
+
+    time = GLOBAL_TIME.tick_start.tv_sec - GLOBAL_TIME.start_time.tv_sec;
+    lostsec = GLOBAL_TIME.lost_time.tv_sec;
+    lostsec = GLOBAL_TIME.lost_time.tv_sec;
+    lostnsec = GLOBAL_TIME.lost_time.tv_nsec;
+
+    snprintf(message, mlen, 
+        "This plane:\nAlive: %d, Dead: %d\n\nGlobal state: (time in sec)\nTime %ld\nLost time %ld.%ld",
+        alive, dead,
+        time, lostsec, lostnsec
+    );
+    render_popup_getch(message);
 }
 
 int ckey_r() {
@@ -472,7 +576,7 @@ int control_cycle() {
             break;
         case 'h':
             {
-                char *message = "HELP\n------------\n[h]: see help\n[e]: edit rectangle\n[k]: kill rectangle\n[r]: restart\n[q]: quit :(\nSPACE: pause game";
+                char *message = "HELP\n------------\n[h]: see help\n[s]: statistics\n[e]: edit rectangle\n[k]: kill rectangle\n[r]: restart\n[q]: quit :(\nSPACE: pause game";
                 render_popup_getch(message);
             }
             break;
@@ -481,6 +585,9 @@ int control_cycle() {
             break;
         case 'e':
             ckey_e();
+            break;
+        case 's':
+            ckey_s();
             break;
         case 'q':
             {

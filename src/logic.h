@@ -7,21 +7,27 @@
 #include <math.h>
 //TODO include logger and implement logging interface
 
-/*CONFIG*/
+/* CONFIG */
+/* rectangle and collision */
 #define SIZE_DIFF_TRESHOLD          1.2f        /* rect must be ... times bigger in order to eat another rect*/
-#define WIDTH_INIT_MIN              10           /* rectangle size at start will be between MIN and MAX*/
-#define WIDTH_INIT_MAX              10
-#define HEIGHT_INIT_MIN             10           
-#define HEIGHT_INIT_MAX             10          
+#define WIDTH_INIT_MIN              4           /* rectangle size at start will be between MIN and MAX*/
+#define WIDTH_INIT_MAX              4
+#define HEIGHT_INIT_MIN             4           
+#define HEIGHT_INIT_MAX             4          
 #define SPEED_INIT_MAX              4           /* at game start rectangle speed is not higher than this*/
 #define SPEED_ABS_MAX               15          /* highest possible speed*/
 #define RECTANGLE_INIT_MAX_RETRIES  10          /* stop retrying to spawn rectangle after x attempts*/
-#define TICK_NSEC                   5000000LL   /* 5000000LL => 500ticks/sec, number of ns between ticks*/
+
+/* time */
+#define TICK_NSEC                   33333333    /* 5000000LL => 500ticks/sec, number of ns between ticks*/
 #define NSEC_IN_SEC                 1000000000LL 
 #define BOUNCE_SPEED_FINE           0.4         /* spd = spd - spd*fine*/
-#define COLLISION_DELTA             (float)((float)SPEED_ABS_MAX * TICK_NSEC / NSEC_IN_SEC)
 
-/*INITS*/
+/* derivative defines */
+#define COLLISION_DELTA             (double)((double)SPEED_ABS_MAX * TICK_NSEC / NSEC_IN_SEC)
+#define GLOBAL_TIMER_STEP           TICK_NSEC   /* TODO */
+
+/* INITS */
 #define RANDOM_NO_STIM  (rand() % SE_NUMBER)
 #define RANDOM_FOOD     (rand() % FE_NUMBER)
 #define RANDOM_BIG      (rand() % BE_NUMBER)
@@ -42,7 +48,6 @@
 #define DEFAULT_PURSUE_SPEED    4.5      
 #define DEFAULT_FOOD_DIST       5    
 #define DEFAULT_FOOD_SPEED      4     
-/*END CONFIG*/
 
 /* IMPORTANT NOTICE
  * speed is given in distance units per second */
@@ -63,7 +68,7 @@ enum food       { fo_idle, fo_random, fo_lrandom, fo_avoid, fo_seek, FE_NUMBER }
 enum big        { bo_idle, bo_random, bo_lrandom, bo_avoid, bo_seek, BE_NUMBER };
 enum prey       { po_idle, po_random, po_lrandom, po_avoid, po_seek, PE_NUMBER };
 
-enum actions    { a_no_stim, a_food, a_big, a_prey }; 
+enum actions    { a_no_stim, a_food, a_big, a_prey, A_NUMBER }; 
 
 /* traits index kept in enum are used to access items in traits array */
 enum traits     { 
@@ -74,8 +79,6 @@ enum traits     {
 TIE_NUMBER };
 
 /* trait names corresponding to traits enum item names for UI*/
-
-extern const char *trait_names[];
 
 
 /* this type represents selected action's enum number */
@@ -116,6 +119,25 @@ typedef struct rectanlge {
     struct rectangle *lock;     /* pointer to rectangle which rect is locked to*/
 } rectangle_t;
 
+struct global_time {
+    struct timespec tick_start;
+    struct timespec start_time;
+    struct timespec lost_time;
+};
+
+extern const char *trait_names      [];
+extern const char *action_slot_names[];
+
+extern const char **funames         []; /* contains lower 4 arrays */
+extern const char *funames_no_stim  [];
+extern const char *funames_food     [];
+extern const char *funames_big      [];
+extern const char *funames_prey     [];
+
+extern struct global_time GLOBAL_TIME;
+
+
+
 /* checks if timer elapsed
  * if elapsed sets timer to current time and returnt true
  * if not returns false*/
@@ -124,6 +146,11 @@ void timer_waitreset(struct timespec *start, long long nsecs);
 void timer_reset(struct timespec *start);
 void timer_wait(struct timespec *start, long long nsecs);
 int  timer_check(struct timespec *start, long long nsecs);
+
+void time_begin();
+void time_start_logic();
+void time_next();
+void time_next_nowait();
 
 rectangle_t *rectangle_create(); /*done*/
 

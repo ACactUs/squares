@@ -1,8 +1,8 @@
-CC = clang
+CC = gcc
 CFLAGS = -Wall -Wextra -Wconversion -std=gnu99
 LFLAGS = -lm -lncurses
-BUILDFLAGS = -O2
-DBGFLAGS = -ggdb -g3 -O0
+BUILDFLAGS = -Os
+DBGFLAGS = -ggdb -g3 -Og
 
 default: debug
 
@@ -11,6 +11,9 @@ debug: clean squares
 
 build: CFLAGS += $(BUILDFLAGS)
 build: clean squares
+
+profile: CFLAGS += -pg
+profile: clean build
 
 squares: logic.o render.o main.o
 	$(CC) $(CFLAGS) $(LFLAGS) -o out $^
