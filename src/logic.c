@@ -9,6 +9,11 @@
 
 struct global_time GLOBAL_TIME;
 
+/* VERY IMPORTANT:
+ * jump and string tables below must ALWAYS be up to date with corresponding enums in header file
+ * failing to keep them up to date will cause wrong function names at user output and 
+ * will cause wrong functions to be called for rectangle actions */
+
 const char *trait_names[] = {
     "movement speed", "acceleration", "seconds to idle",
     "random move delay", "avoid distance", "avoid speed",
@@ -16,15 +21,58 @@ const char *trait_names[] = {
     "food pursue speed",
 "traits number" };
 
+
 const char* action_slots_names[] = { 
     "no stim", "food", "run", "hunt" 
 }; 
 
+/* function names table for user output */
 const char *funames_no_stim  [] = { "idle", "move random", "long random move" };
 const char *funames_food     [] = { "idle", "move random", "long random move", "avoid", "seek" };
 const char *funames_big      [] = { "idle", "move random", "long random move", "avoid", "seek" };
 const char *funames_prey     [] = { "idle", "move random", "long random move", "avoid", "seek" };
 const char **funames         [] = { funames_no_stim, funames_food, funames_big, funames_prey };
+
+const unsigned int action_enums_size[] = {
+    SE_NUMBER, FE_NUMBER, BE_NUMBER, PE_NUMBER
+};
+
+/* jump tables for each action, 
+ * this one is for rectangle->action[a_no_stim][key], key>0, key<SE_NUMBER*/
+static void (* const action_nostim_functs[])(plane_t *, int) = {
+    rectangle_hybernate,
+    rectangle_move_random,
+    rectangle_move_lrandom
+};
+
+/* duplicate code because during later development I plan to have
+ * independent functions for each actions 
+ * I implemented jump logic now, so I can separate them later */
+
+/* notice the difference between [] on this function and *const*const on 3 below
+ * if you want to change one of them remove *const and add [] 
+ * (define as array and initialize, not as a const pointer)*/
+static void (* const action_default_functs  [])(plane_t *, int) = {  
+    rectangle_hybernate,
+    rectangle_move_random,
+    rectangle_move_lrandom,
+    rectangle_move_avoid,
+    rectangle_move_seek
+};
+
+static void (*const *const action_food_functs)(plane_t *, int) = action_default_functs;
+static void (*const *const action_big_functs )(plane_t *, int) = action_default_functs;
+static void (*const *const action_prey_functs)(plane_t *, int) = action_default_functs;
+
+
+/* array of constant local jump tables to 
+ * this one is for rectangle->action[nact][key]: nact >0, nact <A_NUMBER; key>0, key<action_enums_size[nact]*/
+static void (*const *const action_functs[])(plane_t *, int) = {
+    action_nostim_functs,
+    action_food_functs,
+    action_big_functs,
+    action_prey_functs
+};
 
 void rectangle_random_name(rectangle_t *rect) {
     int bufsize = sizeof(rect->name);
@@ -111,10 +159,10 @@ void rectangle_default_traits(rectangle_t *rect){
 rectangle_t *rectangle_create() {
     rectangle_t *rect = (rectangle_t*)calloc(1, sizeof(rectangle_t));
 
-    rect->actions.nostim_o  = RANDOM_NO_STIM; 
-    rect->actions.big_o     = RANDOM_BIG; 
-    rect->actions.food_o    = RANDOM_FOOD; 
-    rect->actions.prey_o    = RANDOM_PREY; 
+    rect->actions[a_no_stim ] = RANDOM_NO_STIM; 
+    rect->actions[a_food    ] = RANDOM_FOOD; 
+    rect->actions[a_big     ] = RANDOM_BIG; 
+    rect->actions[a_prey    ] = RANDOM_PREY; 
     
     rectangle_default_traits(rect);
     rectangle_random_name(rect);
@@ -170,96 +218,6 @@ void rectangle_collision_fight(plane_t *plane, int left, int right) {
     plane_remove_rectangle(plane, looser);
 
     return;
-}
-
-void action_nostim(plane_t *plane, int index) {
-    rectangle_t *rect = plane->rects[index];
-    if (!rect) return;
-    switch (rect->actions.nostim_o) {
-        case so_idle:
-            rectangle_hybernate(plane, index);
-            break;
-        case so_random:
-            rectangle_move_random(plane, index);
-            break;
-        case so_lrandom:
-            rectangle_move_lrandom(plane, index);
-            break;
-        default:
-            exit(1);
-    }
-}
-
-void action_food(plane_t *plane, int index) {
-    rectangle_t *rect = plane->rects[index];
-    if (!rect) return;
-    switch (rect->actions.food_o) {
-        case fo_idle:
-            rectangle_hybernate(plane, index);
-            break;
-        case fo_random:
-            rectangle_move_random(plane, index);
-            break;
-        case fo_lrandom:
-            rectangle_move_lrandom(plane, index);
-            break;
-        case fo_avoid:
-            rectangle_move_avoid(plane, index);
-            break;
-        case fo_seek:
-            rectangle_move_seek(plane, index);
-            break;
-        default:
-            exit(1);
-    }
-}
-
-void action_big(plane_t *plane, int index) {
-    rectangle_t *rect = plane->rects[index];
-    if (!rect) return;
-    switch (rect->actions.food_o) {
-        case bo_idle:
-            rectangle_hybernate(plane, index);
-            break;
-        case bo_random:
-            rectangle_move_random(plane, index);
-            break;
-        case bo_lrandom:
-            rectangle_move_lrandom(plane, index);
-            break;
-        case bo_avoid:
-            rectangle_move_avoid(plane, index);
-            break;
-        case bo_seek:
-            rectangle_move_seek(plane, index);
-            break;
-        default:
-            exit(1);
-    }
-}
-
-void action_prey(plane_t *plane, int index) {
-    rectangle_t *rect = plane->rects[index];
-    if (!rect) return;
-    switch (rect->actions.food_o) {
-        case po_idle:
-            rectangle_hybernate(plane, index);
-            break;
-        case po_random:
-            rectangle_move_random(plane, index);
-            break;
-        case po_lrandom:
-            rectangle_move_lrandom(plane, index);
-            break;
-        case po_avoid:
-            rectangle_move_avoid(plane, index);
-            break;
-        case po_seek:
-            rectangle_move_seek(plane, index);
-            break;
-        default:
-            exit (1);
-    }
 }
 
 void rectangle_accelerate(rectangle_t *rect, double speed, double angle) {
@@ -438,11 +396,13 @@ enum actions rectangle_action_get(plane_t *plane, int index) {
 }
 
 void rectangle_act(plane_t *plane, int index) {
-    enum actions action = rectangle_action_get(plane, index);
     rectangle_t *rect = plane->rects[index];
+    enum actions action = rectangle_action_get(plane, index);
+
     /* update rectangle timers */
     double dtime = (double)TICK_NSEC / (double)NSEC_IN_SEC;
     rect->secs_timer += dtime;
+
     /* switch to a_no_stim if rect did not get any other action during ti_nostim_secs */
     if (action == a_no_stim){
         rect->secs_idle += dtime;
@@ -455,20 +415,22 @@ void rectangle_act(plane_t *plane, int index) {
         }
     }
 
-    switch (action) {
-        case a_no_stim:
-            action_nostim(plane, index);
-            break;
-        case a_food:
-            action_food(plane, index);
-            break;
-        case a_big:
-            action_big(plane, index);
-            break;
-        case a_prey:
-            action_prey(plane, index);
-            break;
+    //* rectangle->action[nact][key]: nact >0, nact <A_NUMBER; key>0, key<action_enums_size[nact]*/
+    if (action < 0 || action >= A_NUMBER) {
+        /* invalid action index*/
+        fprintf(stderr, "at logic.c - rectangle_act - invalid action variable\n");
+        exit(1);
     }
+
+    unsigned int fkey = rect->actions[action];
+    if (fkey >= action_enums_size[action]) {
+        /* invalid action slot index for action variable */
+        fprintf(stderr, "at logic.c - rectangle_act - invalid fkey\n");
+        exit(1);
+    }
+
+    action_functs[action][fkey](plane, index);
+
     rectangle_simulate(plane, index);
     if (plane->rects[index]) rect->prev_action = action;
 }

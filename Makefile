@@ -2,7 +2,7 @@ CC = gcc
 CFLAGS = -Wall -Wextra -Wconversion -std=gnu99
 LFLAGS = -lm -lncurses
 BUILDFLAGS = -Os
-DBGFLAGS = -ggdb -g3 -Og
+DBGFLAGS = -ggdb -g3 -O0
 
 default: debug
 

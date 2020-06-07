@@ -28,10 +28,10 @@
 #define GLOBAL_TIMER_STEP           TICK_NSEC   /* TODO */
 
 /* INITS */
-#define RANDOM_NO_STIM  (rand() % SE_NUMBER)
-#define RANDOM_FOOD     (rand() % FE_NUMBER)
-#define RANDOM_BIG      (rand() % BE_NUMBER)
-#define RANDOM_PREY     (rand() % PE_NUMBER)
+#define RANDOM_NO_STIM  (unsigned int)(rand() % SE_NUMBER)
+#define RANDOM_FOOD     (unsigned int)(rand() % FE_NUMBER)
+#define RANDOM_BIG      (unsigned int)(rand() % BE_NUMBER)
+#define RANDOM_PREY     (unsigned int)(rand() % PE_NUMBER)
 /* DEFAULT TRAITS
  * stored as DOUBLES
  * time in seconds,
@@ -82,12 +82,14 @@ TIE_NUMBER };
 
 
 /* this type represents selected action's enum number */
+/*
 typedef struct {
     enum no_stim  nostim_o;
     enum food     food_o;
     enum big      big_o;
     enum prey     prey_o;
 } actions_opt_t;
+*/
 
 int mutate(int eo_target, int e_number, float rate); 
 
@@ -113,7 +115,7 @@ typedef struct rectanlge {
     double secs_timer;          /* used by any of action functs*/
     int move_time;              /* ??? */
 
-    actions_opt_t actions;
+    unsigned int actions[A_NUMBER];
     enum actions prev_action;
     double traits[TIE_NUMBER];  /* array of traits, max index=TIE_NUMBER*/
     struct rectangle *lock;     /* pointer to rectangle which rect is locked to*/
@@ -125,6 +127,8 @@ struct global_time {
     struct timespec lost_time;
 };
 
+extern const unsigned int action_enums_size[];
+
 extern const char *trait_names      [];
 extern const char *action_slot_names[];
 
@@ -134,9 +138,8 @@ extern const char *funames_food     [];
 extern const char *funames_big      [];
 extern const char *funames_prey     [];
 
+
 extern struct global_time GLOBAL_TIME;
-
-
 
 /* checks if timer elapsed
  * if elapsed sets timer to current time and returnt true
@@ -184,6 +187,13 @@ typedef struct {
     struct timespec ts_init;
     struct timespec ts_curr;
 } plane_t;
+/*
+extern void (** const action_functs      [])(plane_t *, int);
+extern void (* const action_nostim_functs[])(plane_t *, int);
+extern void (* const action_food_functs  [])(plane_t *, int);
+extern void (* const action_big_functs   [])(plane_t *, int);
+extern void (* const action_prey_functs  [])(plane_t *, int);
+*/
 
 void frame_render(plane_t plane); /*done*/
 
