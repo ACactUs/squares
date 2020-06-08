@@ -5,14 +5,42 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
+#include <strings.h>
 #include <time.h>
 
 struct global_time GLOBAL_TIME;
 
-/* VERY IMPORTANT:
+/* VERY IMPORTANT
  * jump and string tables below must ALWAYS be up to date with corresponding enums in header file
  * failing to keep them up to date will cause wrong function names at user output and 
  * will cause wrong functions to be called for rectangle actions */
+
+const unsigned int action_enums_size[] = {
+    SE_NUMBER, FE_NUMBER, BE_NUMBER, PE_NUMBER
+};
+const char* action_slot_names[] = { 
+    "no stim", "food", "run", "hunt" 
+}; 
+const char *funames_no_stim  [] = { "idle", "move random", "long random move" };
+const char *funames_food     [] = { "idle", "move random", "long random move", "avoid", "seek" };
+const char *funames_big      [] = { "idle", "move random", "long random move", "avoid", "seek" };
+const char *funames_prey     [] = { "idle", "move random", "long random move", "avoid", "seek" };
+const char **funames         [] = { funames_no_stim, funames_food, funames_big, funames_prey };
+
+const double trait_min_vals [] = { 
+    /*0 because speed cant be < 0*/
+    0,                  0,                  RECT_DELAY_MIN,
+    RECT_DELAY_MIN,     DETECT_DIST_MIN,    0,
+    DETECT_DIST_MIN,    0,                  DETECT_DIST_MIN,
+    0 
+};
+
+const double trait_max_vals [] = {
+    SPEED_ABS_MAX,      ACCEL_ABS_MAX,      RECT_DELAY_MAX,
+    RECT_DELAY_MAX,     DETECT_DIST_MAX,    SPEED_ABS_MAX,
+    DETECT_DIST_MAX,    SPEED_ABS_MAX,      DETECT_DIST_MAX,
+    SPEED_ABS_MAX 
+};
 
 const char *trait_names[] = {
     "movement speed", "acceleration", "seconds to idle",
@@ -22,20 +50,7 @@ const char *trait_names[] = {
 "traits number" };
 
 
-const char* action_slots_names[] = { 
-    "no stim", "food", "run", "hunt" 
-}; 
 
-/* function names table for user output */
-const char *funames_no_stim  [] = { "idle", "move random", "long random move" };
-const char *funames_food     [] = { "idle", "move random", "long random move", "avoid", "seek" };
-const char *funames_big      [] = { "idle", "move random", "long random move", "avoid", "seek" };
-const char *funames_prey     [] = { "idle", "move random", "long random move", "avoid", "seek" };
-const char **funames         [] = { funames_no_stim, funames_food, funames_big, funames_prey };
-
-const unsigned int action_enums_size[] = {
-    SE_NUMBER, FE_NUMBER, BE_NUMBER, PE_NUMBER
-};
 
 /* jump tables for each action, 
  * this one is for rectangle->action[a_no_stim][key], key>0, key<SE_NUMBER*/
@@ -173,12 +188,13 @@ void rectangle_destroy(rectangle_t *rect) {
     free(rect);
 }
 
-void rectangle_resize_x(rectangle_t *rect, float ratio) { 
+//TODO they should do some checks and updates of rectangle state
+void rectangle_resize_x(rectangle_t *rect, double ratio) { 
     //if ( !ratio ) return;
     rect->width *= ratio;
 }
 
-void rectangle_resize_y(rectangle_t *rect, float ratio) { 
+void rectangle_resize_y(rectangle_t *rect, double ratio) { 
     //if ( !ratio ) return;
     rect->height *= ratio;
 }
@@ -187,6 +203,26 @@ rectangle_t *rectangle_copy(rectangle_t *rect) {
     rectangle_t *copy = rectangle_create();
     memcpy(copy, rect, sizeof(rectangle_t));
     return copy;
+}
+
+/* val is double only to keep signature of all setters same */
+int rectangle_set_action(rectangle_t *rect, int index, double val) {
+    unsigned int a_index = (unsigned int)val;
+    if (!rect) return 0;
+    if (index >= A_NUMBER || index < 0)                  return 0;
+    if ( a_index >= action_enums_size[index]) return 0;
+
+    rect->actions[index] = a_index;
+    return 1;
+}
+//TODO
+int rectangle_set_trait(rectangle_t *rect, int index, double val) {
+    if (!rect) return 0;
+    if (index >= TIE_NUMBER || index < 0) return 0;
+    if (val > trait_max_vals[index] || val < trait_min_vals[index]) return 0;
+
+    rect->traits[index] = val;
+    return 1;
 }
 
 void rectangle_collision_fight(plane_t *plane, int left, int right) {
@@ -637,47 +673,137 @@ rectangle_t *rectangle_compare(rectangle_t *left, rectangle_t *right) {
 /* writes rectangle text representation to buffer 
  * returns buffer size or 0 on fail
  * size does NOT include \0 */
-size_t rectangle_represent(rectangle_t *rect, char **buff) {
+
+size_t rectangle_represent_fields(rectangle_t *rect, char **buff) {
     size_t size;
     if (!rect) return 0;
 
     FILE *mstream = open_memstream(buff, &size);
-
-    //always true ???
-    /*
-    if (errno != 0)
-        return 0;
-    */
-
     if (!mstream) return 0;
-
+    
     fprintf(mstream, 
-        "Name: %s\nangle: %frad, y: %f, x: %f, height: %f, width: %f\nenrg: %f\n",
+        "    NAME [%s]\nangle %frad, y %f, x %f, height %f, width %f\nenrg %f",
         rect->name, 
         rect->angle, rect->y, rect->x, rect->height, rect->width,
         rect->energy
     );
 
-    int i;
+    fclose(mstream);
+    return size;
+}
 
-    
+size_t rectangle_represent_actions(rectangle_t *rect, char **buff) {
+    size_t size;
+    if (!rect) return 0;
+
+    FILE *mstream = open_memstream(buff, &size);
+    if (!mstream) return 0;
+
+    fprintf(mstream, "    ACTIONS\n");
+    size_t i;
     /* print each action slot and its function */
-    /*
     for (i = 0; i < A_NUMBER; i++) {
-        fprintf(mstream, "%d:%-19s %s\n", 
+        fprintf(mstream, "%zu %-19s %s", 
             i, action_slot_names[i], funames[i][rect->actions[i]]);
+        if (i + 1 != A_NUMBER) fprintf(mstream, "\n");
     }
-    */
 
-    /* print traits */
+    fclose(mstream);
+    return size;
+}
+
+size_t rectangle_represent_traits(rectangle_t *rect, char **buff) {
+    size_t size;
+    if (!rect) return 0;
+
+    FILE *mstream = open_memstream(buff, &size);
+    if (!mstream) return 0;
+
+    fprintf(mstream, "    TRAITS\n");
+    size_t i;
     for (i = 0; i < TIE_NUMBER; i++) {
-        fprintf(mstream, "%d:%-23s %f", 
+        fprintf(mstream, "%zu %-23s %f", 
             i, trait_names[i], rect->traits[i]);
         if (i + 1 != TIE_NUMBER) fprintf(mstream, "\n");
     }
 
     fclose(mstream);
     return size;
+}
+size_t rectangle_represent(rectangle_t *rect, char **buff) {
+    size_t size;
+    if (!rect) return 0;
+
+    FILE *mstream = open_memstream(buff, &size);
+    if (!mstream) return 0;
+
+    char *fields, *actions, *traits;
+    rectangle_represent_fields(rect, &fields);
+    rectangle_represent_actions(rect, &actions);
+    rectangle_represent_traits(rect, &traits);
+
+    fprintf(mstream, "%s\n%s\n%s", 
+        fields, actions, traits);
+
+    fclose(mstream);
+    return size;
+}
+
+size_t enumerate_actions(char **buf) {
+    size_t size;
+    FILE *mstream;
+    mstream = open_memstream(buf, &size);
+    if (!mstream) return 0;
+
+    int i;
+    for (i = 0; i < A_NUMBER; i++) {
+        fprintf(mstream, "%d %s", 
+            i, action_slot_names[i]);
+        if (i != A_NUMBER - 1) fprintf(mstream, "\n");
+    }
+
+    fclose(mstream);
+    return size;
+}
+
+size_t enumerate_action_values(char **buf, int action_index) {
+    if (action_index < 0 || action_index >= A_NUMBER) return 0;
+
+    size_t size;
+    FILE *mstream;
+    mstream = open_memstream(buf, &size);
+    if (!mstream) return 0;
+
+    fprintf(mstream, "Possible values of [%s]\n", action_slot_names[action_index]);
+
+    size_t i;
+    size_t action_size = action_enums_size[action_index];
+    for (i = 0; i < action_size; i++) {
+        fprintf(mstream, "%zu %s", 
+            i, funames[action_index][i]);
+        if (i != action_size - 1) fprintf(mstream, "\n");
+    }
+
+    fclose(mstream);
+    return size;
+}
+
+size_t enumerate_traits(char **buf) {
+    size_t size;
+    FILE *mstream;
+    mstream = open_memstream(buf, &size);
+    if (!mstream) return 0;
+
+    int i;
+    for (i = 0; i < TIE_NUMBER; i++) {
+        fprintf(mstream, "%d %s", 
+            i, trait_names[i]);
+        if (i != TIE_NUMBER - 1) fprintf(mstream, "\n");
+    }
+
+    fclose(mstream);
+    return size;
+
 }
 
 

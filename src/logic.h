@@ -10,12 +10,17 @@
 /* CONFIG */
 /* rectangle and collision */
 #define SIZE_DIFF_TRESHOLD          1.2f        /* rect must be ... times bigger in order to eat another rect*/
-#define WIDTH_INIT_MIN              4           /* rectangle size at start will be between MIN and MAX*/
-#define WIDTH_INIT_MAX              4
-#define HEIGHT_INIT_MIN             4           
-#define HEIGHT_INIT_MAX             4          
+#define WIDTH_INIT_MIN              2           /* rectangle size at start will be between MIN and MAX*/
+#define WIDTH_INIT_MAX              6
+#define HEIGHT_INIT_MIN             2           
+#define HEIGHT_INIT_MAX             6          
 #define SPEED_INIT_MAX              4           /* at game start rectangle speed is not higher than this*/
-#define SPEED_ABS_MAX               15          /* highest possible speed*/
+#define SPEED_ABS_MAX               15          /* highest possible speed */
+#define ACCEL_ABS_MAX               8           /* highest possible acceleration */
+#define DETECT_DIST_MAX             50          /* rectangles cant detect objects further than this */
+#define DETECT_DIST_MIN             2           /* rectangles will always detect objects at this distance */
+#define RECT_DELAY_MAX              20          /* all rectangles internal timer will wait no more than this*/
+#define RECT_DELAY_MIN              0.75        /* minimum time until timer triggers */
 #define RECTANGLE_INIT_MAX_RETRIES  10          /* stop retrying to spawn rectangle after x attempts*/
 
 /* time */
@@ -38,22 +43,25 @@
  * distance in units,
  * speed in units per second
  * etc...*/
-#define DEFAULT_MSPEED          3 
-#define DEFAULT_ACCEL           1        /* FIXME instant acceleration */
-#define DEFAULT_NOSTIM_SECS     3
-#define DEFAULT_MRANDOM_DELAY   2
-#define DEFAULT_AVOID_DIST      6
-#define DEFAULT_AVOID_SPEED     4      
-#define DEFAULT_PURSUE_DIST     7      
-#define DEFAULT_PURSUE_SPEED    4.5      
-#define DEFAULT_FOOD_DIST       5    
-#define DEFAULT_FOOD_SPEED      4     
+#define DEFAULT_MSPEED          DRAND(1, 5)
+#define DEFAULT_ACCEL           DRAND(0.5, 3)   /* FIXME instant acceleration */
+#define DEFAULT_NOSTIM_SECS     DRAND(1, 3)
+#define DEFAULT_MRANDOM_DELAY   DRAND(1, 2)
+#define DEFAULT_AVOID_DIST      DRAND(3, 8)
+#define DEFAULT_AVOID_SPEED     DRAND(3, 6)
+#define DEFAULT_PURSUE_DIST     DRAND(5, 9)
+#define DEFAULT_PURSUE_SPEED    DRAND(3.25, 6.25)
+#define DEFAULT_FOOD_DIST       DRAND(3, 7)
+#define DEFAULT_FOOD_SPEED      DRAND(2, 6)
 
 /* IMPORTANT NOTICE
  * speed is given in distance units per second */
 
 #define MAX(a,b) ((a) > (b) ? a : b)
 #define MIN(a,b) ((a) < (b) ? a : b)
+#define RAND(min, max) (min + rand() % (max-min+1))
+#define DRAND(min, max) (((double)rand() * ( max - min )) / (double)RAND_MAX + min)
+
 #define true  1
 #define false 0
 #define DELTA 0.000005
@@ -127,16 +135,26 @@ struct global_time {
     struct timespec lost_time;
 };
 
+/* action index size tables */
 extern const unsigned int action_enums_size[];
 
-extern const char *trait_names      [];
+/* action user string tables */
 extern const char *action_slot_names[];
-
+/*TODO append action_ to these names*/
 extern const char **funames         []; /* contains lower 4 arrays */
 extern const char *funames_no_stim  [];
 extern const char *funames_food     [];
 extern const char *funames_big      [];
 extern const char *funames_prey     [];
+
+/* trait permitted values tables */
+extern const double trait_min_vals [];
+extern const double trait_max_vals [];
+
+/* trait user string tables */
+extern const char *trait_names      [];
+
+
 
 
 extern struct global_time GLOBAL_TIME;
@@ -164,19 +182,29 @@ rectangle_t *rectangle_copy(rectangle_t *rect); /*done*/
 
 void rectangle_destroy(rectangle_t *rect); /*done*/
 
+int rectangle_set_action(rectangle_t *rect, int index, double val); /*done*/
+
+int rectangle_set_trait(rectangle_t *rect, int index, double val);  /*done*/
+
 int rectangle_check_collision(rectangle_t *left, rectangle_t *right); /*done*/
 
 /* modifies rectangle so that it is now dest_size times bigger than original */
-void rectangle_resize_x(rectangle_t *rect, float ratio); /*done*/
-void rectangle_resize_y(rectangle_t *rect, float ratio); /*done*/
+void rectangle_resize_x(rectangle_t *rect, double ratio); /*done*/
+void rectangle_resize_y(rectangle_t *rect, double ratio); /*done*/
 
 
 /* return adress of winning rect,
  * if none returns NULL */
 rectangle_t *rectangle_compare(rectangle_t *left, rectangle_t *right); /*done*/
 
-size_t rectangle_represent(rectangle_t *rect, char **buff);
+size_t rectangle_represent(rectangle_t *rect, char **buff); /*done*/
+size_t rectangle_represent_fields(rectangle_t *rect, char **buff);  /*done*/
+size_t rectangle_represent_actions(rectangle_t *rect, char **buff); /*done*/
+size_t rectangle_represent_traits(rectangle_t *rect, char **buff);  /*done*/
 
+size_t enumerate_actions(char **buf);   /*done*/
+size_t enumerate_action_values(char **buf, int action_index);   /*done*/
+size_t enumerate_traits(char **buf);    /*done*/
 double rectangle_size(rectangle_t *rect); /*done*/
 
 typedef struct {

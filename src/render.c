@@ -1,6 +1,5 @@
 #include "render.h"
 #include "logic.h"
-//#include "logic.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <time.h>
@@ -10,7 +9,7 @@
 render_state_t *rstate = NULL;
 
 void render_greeting() {
-    const int msize = 512;
+    const size_t msize = 512;
     char message[msize];
     snprintf(message, msize, 
         "Press h to get help and see options\n\nScreen width %d, height %d\nPlane width %lf, height %lf\nPlane has %d rectangles", 
@@ -413,7 +412,6 @@ void ckey_e1(int target) {
 
     double x, y;
     int is_ok = input_2doubles(msg, &x, &y);
-
     if (!is_ok) return;
 
     if (x < 0 || y < 0 || 
@@ -427,53 +425,100 @@ void ckey_e1(int target) {
     }
 }
 
-/*action*/
-void ckey_e4(int target) {
-    struct popup_state p;
-    rectangle_t *rect;
+void ckey_e2(int target) {
+    rectangle_t *rect = rstate->plane->rects[target];
+    char msg[64];
+    snprintf(msg, 64, "(w=%f, h=%f)Enter new [w h]: ", rect->width, rect->height);
 
-    //TODO
+    double w, h;
+    int is_ok = input_2doubles(msg, &w, &h);
+    if (!is_ok) return;
+
+    double wratio = w/rect->width;
+    double hratio = h/rect->height;
+
+    rectangle_resize_x(rect, wratio);
+    rectangle_resize_y(rect, hratio);
+}
+
+/* setter function must set value val given its index in list, return 1 on success 0 on failure 
+ * enumeerate_values - one of enumerate_X_values functions from logic.c */
+void edit_list(int target, int minindex, int maxindex, 
+    size_t (*enumerate_options)(rectangle_t *, char**),
+    size_t (*enumerate_values)(char** , int), 
+    int (*setter)(rectangle_t *rect, int index, double val)) 
+{
+    if (!setter) return;
+
+    rectangle_t *rect;
+    int index, is_ok;
+    struct popup_state p;
+    size_t osize;
+    char *options;
+    rect = rstate->plane->rects[target];
+
+    osize = enumerate_options(rect, &options);
+    if (!osize) return;
+
+    p = render_popup(options);
+    free(options);
+
+    if (!p.box || !p.popup) return;
+
+    is_ok = input_int("Index: ", &index);
+    if (!is_ok) {
+        popup_clean(p);
+        return;
+    }
+
+    if (index < minindex || index > maxindex) {
+        popup_clean(p);
+        render_status("Invalid index");
+        return;
+    }
+
+    struct popup_state pval;
+    double val;
+    size_t size;
+
+    if (enumerate_values) {
+        char *valtable;
+        size = enumerate_values(&valtable, index);
+        if (!size) return;
+        pval = render_popup(valtable);
+        free(valtable);
+    }
+
+    is_ok = input_double("New value: ", &val);
+
+    if (enumerate_values) popup_clean(pval);
+
+    if (!is_ok) {
+        popup_clean(p);
+        return;
+    }
 
     rect = rstate->plane->rects[target];
+    is_ok = setter(rect, index, val);
+    if (!is_ok) render_status("Failed setting");
+
+    popup_clean(p);
+}
+
+/*action*/
+void ckey_e4(int target) {
+    edit_list(target, 0, A_NUMBER - 1, 
+        rectangle_represent_actions,
+        enumerate_action_values, 
+        rectangle_set_action);
 }
 
 /*traits*/
 void ckey_e5(int target) {
-    rectangle_t *rect;
-    int traitnum, is_ok;
-    struct popup_state p;
-    size_t rsize;
-    char *rrepr;
-    rect = rstate->plane->rects[target];
-
-    rsize = rectangle_represent(rect, &rrepr);
-    if (!rsize) return;
-
-    p = render_popup(rrepr);
-    free(rrepr);
-    if (!p.box || !p.popup) return;
-
-    is_ok = input_int("Select trait: ", &traitnum);
-    if (!is_ok) {
-        popup_clean(p);
-        return;
-    }
-
-    if (traitnum < 0 || traitnum >= TIE_NUMBER) {
-        popup_clean(p);
-        render_status("Invalid trait");
-        return;
-    }
-
-    double val;
-    is_ok = input_double("New value: ", &val);
-    if (!is_ok) {
-        popup_clean(p);
-        return;
-    }
-
-    rect = rstate->plane->rects[target];
-    rect->traits[traitnum] = val;
+    edit_list(target, 0, TIE_NUMBER - 1, 
+        rectangle_represent_traits,
+        NULL, //TODO write function to print possible values for traits
+        rectangle_set_trait);
 }
 
 void ckey_emenu(int target, int key) {
@@ -482,6 +527,8 @@ void ckey_emenu(int target, int key) {
             ckey_e1(target);
             break;
         case '2':
+            ckey_e2(target);
+            break;
         case '3':
             render_popup_getch("Not implemented");
             break;
@@ -498,7 +545,7 @@ void ckey_e() {
     int target = input_select_rect("Edit rectangle: ");
     if (target == -1) return;
 
-    const int max_size = 512;
+    const size_t max_size = 512;
     char message[max_size];
 
     render_status("Editing");
@@ -510,9 +557,6 @@ void ckey_e() {
 }
 
 void ckey_s() {
-    size_t mlen = 256;
-    char message[mlen];
-
     int alive = rstate->plane->rect_alive;
     int dead = rstate->plane->rect_max - alive;
 
@@ -523,12 +567,32 @@ void ckey_s() {
     lostsec = GLOBAL_TIME.lost_time.tv_sec;
     lostnsec = GLOBAL_TIME.lost_time.tv_nsec;
 
-    snprintf(message, mlen, 
-        "This plane:\nAlive: %d, Dead: %d\n\nGlobal state: (time in sec)\nTime %ld\nLost time %ld.%ld",
+
+    FILE *mstream;
+    size_t size;
+    char *message;
+    mstream = open_memstream(&message, &size);
+    if (!mstream) return;
+
+    fprintf(mstream, 
+        "This plane:\nAlive: %d, Dead: %d\n\nGlobal state: (time in sec)\nTime %ld\nLost time %ld.%ld\n\n",
         alive, dead,
         time, lostsec, lostnsec
     );
+
+    size_t s;
+    char *t;
+    s = enumerate_traits(&t);
+    if (!s) return;
+
+    fprintf(mstream, "Possible traits\n%s", t);
+    free(t);
+
+    fclose(mstream);
+    if (!size) return;
+
     render_popup_getch(message);
+    free(message);
 }
 
 int ckey_r() {
