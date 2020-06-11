@@ -16,7 +16,9 @@
 #define HEIGHT_INIT_MAX             6          
 #define SPEED_INIT_MAX              4           /* at game start rectangle speed is not higher than this*/
 #define SPEED_ABS_MAX               15          /* highest possible speed */
+#define SPEED_ABS_MIN               0           
 #define ACCEL_ABS_MAX               8           /* highest possible acceleration */
+#define ACCEL_ABS_MIN               0           
 #define DETECT_DIST_MAX             50          /* rectangles cant detect objects further than this */
 #define DETECT_DIST_MIN             2           /* rectangles will always detect objects at this distance */
 #define RECT_DELAY_MAX              20          /* all rectangles internal timer will wait no more than this*/
@@ -43,16 +45,6 @@
  * distance in units,
  * speed in units per second
  * etc...*/
-#define DEFAULT_MSPEED          DRAND(1, 5)
-#define DEFAULT_ACCEL           DRAND(0.5, 3)   /* FIXME instant acceleration */
-#define DEFAULT_NOSTIM_SECS     DRAND(1, 3)
-#define DEFAULT_MRANDOM_DELAY   DRAND(1, 2)
-#define DEFAULT_AVOID_DIST      DRAND(3, 8)
-#define DEFAULT_AVOID_SPEED     DRAND(3, 6)
-#define DEFAULT_PURSUE_DIST     DRAND(5, 9)
-#define DEFAULT_PURSUE_SPEED    DRAND(3.25, 6.25)
-#define DEFAULT_FOOD_DIST       DRAND(3, 7)
-#define DEFAULT_FOOD_SPEED      DRAND(2, 6)
 
 /* IMPORTANT NOTICE
  * speed is given in distance units per second */
@@ -126,7 +118,7 @@ typedef struct rectanlge {
     unsigned int actions[A_NUMBER];
     enum actions prev_action;
     double traits[TIE_NUMBER];  /* array of traits, max index=TIE_NUMBER*/
-    struct rectangle *lock;     /* pointer to rectangle which rect is locked to*/
+    int lock;                   /* pointer to rectangle which rect is locked to*/
 } rectangle_t;
 
 struct global_time {
@@ -243,7 +235,7 @@ void rectangle_move_seek    (plane_t *plane, int index);
 /* this function returns acceleration at current tick 
  * it also calculates energy spendings for acceleration
  * WARN function does not perform speed limit checks*/
-void rectangle_accelerate(rectangle_t *rect, double speed, double angle);
+void rectangle_accelerate(rectangle_t *rect, double speed, double angle, double accel);
 
 /*returns enum value of action which will be delegated to rectangle*/
 enum actions rectangle_action_get(plane_t *plane, int index); /*done*/
@@ -269,10 +261,10 @@ void plane_destroy(plane_t *plane); /*done*/
 void plane_remove_rectangle(plane_t *plane, int index); /*done*/
 
 /* returns first collision rectangle index, sets flag true if collision happened*/
-int plane_check_collisions(plane_t *plane, int index, int *flag_collided); /*FIXME*/
+int plane_check_collisions(plane_t *plane, int index); /*FIXME*/
 
 /* returns index of first rectanle which matches threshold */
-int plane_get_proximate_rectangle(plane_t *plane, int index, double mindist, enum size_diff_e type, int *flagExists); /*done*/
+int plane_get_proximate_rectangle(plane_t *plane, int index, double mindist, enum size_diff_e type); /*done*/
 
 /* should be called on collision, manages rectagles fight only */
 void rectangle_collision_fight(plane_t *plane, int left, int right); /*done*/

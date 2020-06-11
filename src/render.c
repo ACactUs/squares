@@ -607,6 +607,7 @@ int ckey_r() {
         p = plane_create((rstate->canv_maxx+1) / rstate->char_htw, rstate->canv_maxy+1);
         plane_init(p, NULL, 10);
         render_load(p);
+        render_status("Restarted");
         return false;
     }
     return true;
