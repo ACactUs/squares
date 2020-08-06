@@ -69,7 +69,7 @@ const char *trait_names[] = {
 /* jump tables for each action, 
  * this one is for rectangle->action[a_no_stim][key], key>0, key<SE_NUMBER*/
 static void (* const action_nostim_functs[])(plane_t *, int) = {
-    rectangle_hybernate,
+    rectangle_hibernate,
     rectangle_move_random,
     rectangle_move_lrandom
 };
@@ -82,7 +82,7 @@ static void (* const action_nostim_functs[])(plane_t *, int) = {
  * if you want to change one of them remove *const and add [] 
  * (define as array and initialize, not as a const pointer)*/
 static void (* const action_default_functs  [])(plane_t *, int) = {  
-    rectangle_hybernate,
+    rectangle_hibernate,
     rectangle_move_random,
     rectangle_move_lrandom,
     rectangle_move_avoid,
@@ -272,6 +272,17 @@ double rectangle_speed_get(rectangle_t *rect) {
     return sqrt(rect->xspeed * rect->xspeed + rect->yspeed * rect->yspeed);
 }
 
+double rectangle_get_angle(rectangle_t *rect, rectangle_t *target) {
+	double x1, x2, y1, y2;
+    x1 = rect->x;
+    y1 = rect->y;
+
+    x2 = target->x;
+    y2 = target->x;
+    
+    return atan2(y2 - y1, x2 - x1) - 3.1415/2;
+}
+
 double dot_distance(double x1, double y1, double x2, double y2) {
     double dx, dy;
     double sx, sy;
@@ -284,14 +295,8 @@ double dot_distance(double x1, double y1, double x2, double y2) {
 
 /*speed units/sec, angle radians (0 - down, Pi/2 - left, Pi - up, ...), accel units/sec^2*/
 void rectangle_accelerate(rectangle_t *rect, double speed, double angle, double accel) {
-    //TODO handle negative angles
-    //while (angle > 2*M_PI) angle -= M_PI;
-    if (angle < 0) {
-        //TODO ASSERT
-        fprintf(stderr, "Acceleration angle < 0");
-        exit(1);
-    }
     angle = fmod(angle, 2*M_PI);
+    if (angle < 0) angle = M_PI*2 + angle;
     int dl  = angle >= 0        && angle <= M_PI/2,
         ul  = angle > M_PI/2    && angle <= M_PI,
         ur  = angle > M_PI      && angle <= M_PI*1.5,
@@ -373,7 +378,7 @@ void rectangle_TESTMOVE     (plane_t *plane, int index) {
  * it must be called on initialize or traits change 
  * like: if (speed > SPEED_ABS_MAX) speed = SPEED_ABS_MAX; 
  * */
-void rectangle_hybernate    (plane_t *plane, int index) { 
+void rectangle_hibernate    (plane_t *plane, int index) { 
     double angle, accel;
     rectangle_t *rect = plane->rects[index];
     accel = rect->traits[ti_accel];
@@ -396,8 +401,35 @@ void rectangle_move_random  (plane_t *plane, int index) {
 }
 
 void rectangle_move_lrandom (plane_t *plane, int index) { rectangle_TESTMOVE(plane, index); }
-void rectangle_move_avoid   (plane_t *plane, int index) { rectangle_TESTMOVE(plane, index); }
-void rectangle_move_seek    (plane_t *plane, int index) { rectangle_TESTMOVE(plane, index); }
+
+void rectangle_move_avoid   (plane_t *plane, int index) { 
+    double angle, speed, accel;
+    rectangle_t *rect, *target;
+    rect = plane->rects[index];
+    target = plane->rects[rect->lock];
+    if (!target) return;
+
+    /* opposite angle */
+    angle = rectangle_get_angle(rect, target) + M_PI;
+    accel = rect->traits[ti_accel];
+    speed = rect->traits[ti_avoid_speed];
+
+    rectangle_accelerate(rect, speed, angle, accel);
+}
+
+void rectangle_move_seek    (plane_t *plane, int index) {
+    double angle, speed, accel;
+    rectangle_t *rect, *target;
+    rect = plane->rects[index];
+    target = plane->rects[rect->lock];
+    if (!target) return;
+
+    angle = rectangle_get_angle(rect, target);
+    accel = rect->traits[ti_accel];
+    speed = rect->traits[ti_pursue_speed];
+
+    rectangle_accelerate(rect, speed, angle, accel);
+}
 
 /* FIXME deprecated */
 void timer_wait(struct timespec *start, long long nsecs) {
@@ -496,6 +528,7 @@ enum actions rectangle_action_get(plane_t *plane, int index) {
         rect->lock = target;
         return a_big;
     }
+
     target = plane_get_proximate_rectangle(plane, index, rect->traits[ti_pursue_dist], sd_prey);
     if (target != -1) {
         rect->lock = target;
@@ -613,15 +646,15 @@ static inline double col_id(rectangle_t *r, rectangle_t *t) {
 }
 
 static inline void col_apply(rectangle_t *r, double *xovershoot, double *yovershoot) {
-        if (fabs(*xovershoot) > COLLISION_DELTA) {
-            *xovershoot = 0;
-        }
-        if (fabs(*yovershoot) > COLLISION_DELTA) {
-            *yovershoot = 0;
-        } 
+    if (fabs(*xovershoot) > COLLISION_DELTA) {
+        *xovershoot = 0;
+    }
+    if (fabs(*yovershoot) > COLLISION_DELTA) {
+        *yovershoot = 0;
+    } 
 
-        r->x -= 2* *xovershoot;
-        r->y -= 2* *yovershoot;
+    r->x -= 2* *xovershoot;
+    r->y -= 2* *yovershoot;
 }
 
 /* lol clear bloat */
@@ -902,36 +935,44 @@ void rectangle_relocate_randomly(plane_t *plane, rectangle_t *rect) {
     //TODO initialize actions randomly
 }
 
-/* **rects pointer for copying them from existing plane */
-void  plane_init(plane_t *plane, rectangle_t **rects, int rects_number) {
-    if (rects_number < 0) rects_number = 0;
+static void plane_empty(plane_t *plane) {
+    if (plane->rects) {
+        int i;
+        for (i = 0; i < plane->rect_max; i++) {
+            if (plane->rects[i]) rectangle_destroy(plane->rects[i]);
+        }
+        free(plane->rects);
+    }
+    plane->rect_max = 0;
+    plane->rect_alive = 0;
+    timer_reset(&plane->ts_init);
+    timer_reset(&plane->ts_curr);
+}
+
+void plane_populate_randomly(plane_t *plane, int rects_number) {
+    plane_empty(plane);
     plane->rects = calloc(sizeof(rectangle_t*), (size_t)rects_number);
     plane->rect_max = rects_number;
     plane->rect_alive = rects_number;
-    timer_reset(&plane->ts_init);
-    /* if no rects given create them*/
-    if (!rects){
-        int i;
-        for (i = 0; i < rects_number; i++) {
-            rectangle_t *rect = plane->rects[i] = rectangle_create();
-            rectangle_relocate_randomly(plane, rect);
-            int j = 0;
-            int col_index;
-            while (j++ < RECTANGLE_INIT_MAX_RETRIES) { 
-                col_index = plane_check_collisions(plane, i);
-                if (!col_index) break;
-                rectangle_relocate_randomly(plane, rect);        
-            }
-            if (j == RECTANGLE_INIT_MAX_RETRIES) {
-                plane_remove_rectangle(plane, i);
-            }
+    int i;
+    for (i = 0; i < rects_number; i++) {
+        rectangle_t *rect = plane->rects[i] = rectangle_create();
+        rectangle_relocate_randomly(plane, rect);
+        int j = 0;
+        int col_index;
+        while (j++ < RECTANGLE_INIT_MAX_RETRIES) { 
+            col_index = plane_check_collisions(plane, i);
+            if (!col_index) break;
+            rectangle_relocate_randomly(plane, rect);        
         }
-        /* TODO beter initialization*/
-    } else { 
-        /*load existing rects*/
-        exit(1); 
+        if (j == RECTANGLE_INIT_MAX_RETRIES) {
+            plane_remove_rectangle(plane, i);
+        }
     }
+    /* TODO beter initialization*/
 }
+
+void plane_populate_recombinate(plane_t *plane, rectangle_t **rects, int rects_number);
 
 plane_t *plane_create(double xsize, double ysize) {
     plane_t *plane = calloc(sizeof(plane_t), 1);

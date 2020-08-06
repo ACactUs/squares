@@ -226,7 +226,7 @@ void action_food    (plane_t *plane, int index); /*partially*/
 void action_big     (plane_t *plane, int index); /*partially*/
 void action_prey    (plane_t *plane, int index); /*partially*/
 
-void rectangle_hybernate    (plane_t *plane, int index); 
+void rectangle_hibernate    (plane_t *plane, int index); 
 void rectangle_move_random  (plane_t *plane, int index); 
 void rectangle_move_lrandom (plane_t *plane, int index); 
 void rectangle_move_avoid   (plane_t *plane, int index); 
@@ -254,6 +254,9 @@ plane_t *plane_create(double xsize, double ysize); /*done*/
 
 /* if rects is NULL, plane will be initialized with random rects */
 void plane_init(plane_t *plane, rectangle_t **rects, int rects_size); /*done*/
+void plane_populate_randomly(plane_t *plane, int rects_number); /*done*/
+void plane_populate_recombinate(plane_t *plane, rectangle_t **rects, int rects_number);
+void plane_populate_alive(plane_t *plane, rectangle_t **rects, int rects_number);
 
 /* need func which conditions plane reset*/
 void plane_destroy(plane_t *plane); /*done*/

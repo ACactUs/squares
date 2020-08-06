@@ -605,7 +605,7 @@ int ckey_r() {
         /* TODO ask user to fill fields 
          * TODO create plane from rstate as new funct */
         p = plane_create((rstate->canv_maxx+1) / rstate->char_htw, rstate->canv_maxy+1);
-        plane_init(p, NULL, 10);
+        plane_populate_randomly(p, 10);
         render_load(p);
         render_status("Restarted");
         return false;
