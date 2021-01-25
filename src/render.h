@@ -61,7 +61,7 @@ void zoom_set(plane_t *plane);
 
 void render_frame(); /*done*/
 
-void render_rectangle(int index); /*done*/
+void render_rec(int index); /*done*/
 
 void render_status(char *message); /*done*/
 

@@ -5,7 +5,8 @@
 #include "render.h"
 #include "logic.h"
 
-int main(){
+int 
+main(){
     srand((unsigned int)time(NULL));
     render_init();
 

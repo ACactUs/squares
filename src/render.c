@@ -8,7 +8,8 @@
 
 render_state_t *rstate = NULL;
 
-void render_greeting() {
+void
+render_greeting() {
     const size_t msize = 512;
     char message[msize];
     snprintf(message, msize, 
@@ -23,7 +24,8 @@ void render_greeting() {
     wrefresh(rstate->canvas);
 }
 
-void render_frame(){
+void
+render_frame(){
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     long long nsec_elapsed = (ts.tv_sec - rstate->ts_last_render.tv_sec) * 1000000000LL
@@ -35,16 +37,17 @@ void render_frame(){
     box(rstate->canvas, 0, 0);
     wnoutrefresh(rstate->canvas);
     for (i = 0; i < rect_max; i++) {
-        rectangle_t *rect = rstate->plane->rects[i];
+        rec_t *rect = rstate->plane->rects[i];
         if (!rect) continue;
-        render_rectangle(i);
+        render_rec(i);
     }
 
     clock_gettime(CLOCK_MONOTONIC, &rstate->ts_last_render);
     doupdate();
 }
 
-void render_rectangle(int index) {
+void
+render_rec(int index) {
     WINDOW *win = rstate->rect_wins[index];
     if (index >= rstate->plane->rect_max) {
         render_status("ERR: Index too big at render_rectangle!... press any key");
@@ -52,10 +55,10 @@ void render_rectangle(int index) {
         return;
     }
 
-    rectangle_t *rect = rstate->plane->rects[index];
+    rec_t *rect = rstate->plane->rects[index];
 
     if (!rect) {
-        render_status("ERR: Rect does not exist at render_rectangle... press any key");
+        render_status("ERR: Rect does not exist at render_rec... press any key");
         wgetch(rstate->status);
         return;
     }
@@ -82,7 +85,7 @@ void render_rectangle(int index) {
 
     size_t m_len = 8;
     char message[m_len];
-    snprintf(message, m_len, "%.5s", rect->name);
+    snprintf(message, m_len, "%.5s", rect->p.name);
     mvwprintw(win, 1, 1, message);
 
 
@@ -109,7 +112,8 @@ void render_rectangle(int index) {
     wnoutrefresh(win);
 }
 
-void render_load(plane_t *plane) {
+void
+render_load(plane_t *plane) {
     int wins = plane->rect_max;
     rstate->rect_wins = calloc(sizeof(WINDOW*), (size_t)wins);
     rstate->zoom = zo_none;
@@ -118,7 +122,7 @@ void render_load(plane_t *plane) {
     /* init every window*/
     int i;
     for (i = 0; i < wins; i++) {
-        rectangle_t *rect = plane->rects[i];
+        rec_t *rect = plane->rects[i];
         if (!rect) continue;
 
         int lines, cols, by, bx;
@@ -132,7 +136,8 @@ void render_load(plane_t *plane) {
     }
 }
 
-void render_unload() {
+void
+render_unload() {
     /* close every non-NULL window*/
     int i;
     if (!rstate) return;
@@ -149,7 +154,8 @@ void render_unload() {
     rstate->plane = NULL;
 }
 
-void render_init() {
+void
+render_init() {
     rstate = calloc(sizeof(render_state_t), 1);
     initscr();
     cbreak();
@@ -182,19 +188,22 @@ void render_init() {
     refresh();
 }
 
-void render_status(char *message) { 
+void
+render_status(char *message) { 
     render_clear_status();
     mvwprintw(rstate->status, 0, 0, message);
     
     wrefresh(rstate->status);
 }
 
-void render_clear_status() {
+void
+render_clear_status() {
     werase(rstate->status);
     wrefresh(rstate->status);
 }
 
-void render_exit() {
+void
+render_exit() {
     plane_t *plane = rstate->plane;
     render_unload();
     plane_destroy(plane);
@@ -205,7 +214,8 @@ void render_exit() {
 }
 
 /* returns -1 on fail */
-int calculate_height(char *message, int width) {
+int
+calculate_height(char *message, int width) {
     const int   max_rets = 32;
 
     int i;
@@ -244,12 +254,14 @@ int calculate_height(char *message, int width) {
     return height;
 }
 
-void popup_clean(struct popup_state p) {
+void
+popup_clean(struct popup_state p) {
     if (p.box) delwin(p.box);
     if (p.popup) delwin(p.popup);
 }
 
-struct popup_state render_popup(char *message) {
+struct popup_state
+render_popup(char *message) {
     struct popup_state p;
     p.box = NULL;
     p.popup = NULL;
@@ -273,7 +285,8 @@ struct popup_state render_popup(char *message) {
     return p;
 }
 
-int render_popup_getch(char *message) {
+int
+render_popup_getch(char *message) {
     struct popup_state p;
     p = render_popup(message);
     if (!p.box || !p.popup) return 0;
@@ -287,7 +300,8 @@ int render_popup_getch(char *message) {
 }
 
 /* returns 1 on success, writes int to res address */
-int input_int(char *prompt, int *res) {
+int
+input_int(char *prompt, int *res) {
     WINDOW *win = rstate->status;
     if (!win) return 0;
 
@@ -308,7 +322,8 @@ int input_int(char *prompt, int *res) {
 }
 
 /* WARN string must be freed after use */
-char *input_string(char *prompt) {
+char *
+input_string(char *prompt) {
     WINDOW *win = rstate->status;
     int was_nodelay = is_nodelay(win);
     nodelay(win, false);
@@ -324,7 +339,8 @@ char *input_string(char *prompt) {
     return input;
 }
 
-int input_double(char *message, double *a) {
+int
+input_double(char *message, double *a) {
     double x;
     char *input = input_string(message);
     int nscaned = sscanf(input, "%lf", &x);
@@ -340,7 +356,8 @@ int input_double(char *message, double *a) {
 }
 
 /* returns 0 on success */
-int input_2doubles(char *message, double *a, double *b) {
+int
+input_2doubles(char *message, double *a, double *b) {
     double x, y;
     char *input = input_string(message);
     int nscaned = sscanf(input, "%lf %lf", &x, &y);
@@ -356,7 +373,8 @@ int input_2doubles(char *message, double *a, double *b) {
     return 1;
 }
 
-int input_select_rect(char *prompt) {
+int
+input_select_rect(char *prompt) {
     int target;
     int is_success = input_int(prompt, &target);
     noecho();
@@ -373,7 +391,8 @@ int input_select_rect(char *prompt) {
     return -1;
 }
 
-void ckey_space() {
+void
+ckey_space() {
     nodelay(rstate->status, false);
     render_status("Game is paused, press any key to unpause...");
     wgetch(rstate->status);
@@ -381,23 +400,25 @@ void ckey_space() {
     render_status("Unpaused...");
 }
 
-void ckey_k() {
+void
+ckey_k() {
     int target = input_select_rect("Kill index: ");
     if (target == -1) return;
 
-    plane_remove_rectangle(rstate->plane, target);
+    plane_remove_rec(rstate->plane, target);
     render_status("Removed!");
 }
 
-void ckey_p() {
+void
+ckey_p() {
     int target = input_select_rect("Print rectangle: ");
     if (target == -1) return;
 
     render_status("Printing");
-    rectangle_t *rect = rstate->plane->rects[target];
+    rec_t *rect = rstate->plane->rects[target];
 
     char *message;
-    size_t bufsize = rectangle_represent(rect, &message);
+    size_t bufsize = rec_represent(rect, &message);
     if (bufsize == 0) return;
 
     render_popup_getch(message);
@@ -405,8 +426,9 @@ void ckey_p() {
 }
 
 /* move left corner */
-void ckey_e1(int target) {
-    rectangle_t *rect = rstate->plane->rects[target];
+void
+ckey_e1(int target) {
+    rec_t *rect = rstate->plane->rects[target];
     char msg[64] = {0};
     snprintf(msg, 64, "(x=%f, y=%f)Enter new [x y]: ", rect->x, rect->y);
 
@@ -425,8 +447,9 @@ void ckey_e1(int target) {
     }
 }
 
-void ckey_e2(int target) {
-    rectangle_t *rect = rstate->plane->rects[target];
+void
+ckey_e2(int target) {
+    rec_t *rect = rstate->plane->rects[target];
     char msg[64];
     snprintf(msg, 64, "(w=%f, h=%f)Enter new [w h]: ", rect->width, rect->height);
 
@@ -437,20 +460,21 @@ void ckey_e2(int target) {
     double wratio = w/rect->width;
     double hratio = h/rect->height;
 
-    rectangle_resize_x(rect, wratio);
-    rectangle_resize_y(rect, hratio);
+    rec_resize_x(rect, wratio);
+    rec_resize_y(rect, hratio);
 }
 
 /* setter function must set value val given its index in list, return 1 on success 0 on failure 
  * enumeerate_values - one of enumerate_X_values functions from logic.c */
-void edit_list(int target, int minindex, int maxindex, 
-    size_t (*enumerate_options)(rectangle_t *, char**),
+void
+edit_list(int target, int minindex, int maxindex, 
+    size_t (*enumerate_options)(rec_t *, char**),
     size_t (*enumerate_values)(char** , int), 
-    int (*setter)(rectangle_t *rect, int index, double val)) 
+    int (*setter)(rec_t *rect, int index, double val)) 
 {
     if (!setter) return;
 
-    rectangle_t *rect;
+    rec_t *rect;
     int index, is_ok;
     struct popup_state p;
     size_t osize;
@@ -506,22 +530,25 @@ void edit_list(int target, int minindex, int maxindex,
 }
 
 /*action*/
-void ckey_e4(int target) {
+void
+ckey_e4(int target) {
     edit_list(target, 0, A_NUMBER - 1, 
-        rectangle_represent_actions,
+        rec_represent_actions,
         enumerate_action_values, 
-        rectangle_set_action);
+        rec_set_action);
 }
 
 /*traits*/
-void ckey_e5(int target) {
+void
+ckey_e5(int target) {
     edit_list(target, 0, TIE_NUMBER - 1, 
-        rectangle_represent_traits,
+        rec_represent_traits,
         NULL, //TODO write function to print possible values for traits
-        rectangle_set_trait);
+        rec_set_trait);
 }
 
-void ckey_emenu(int target, int key) {
+void
+ckey_emenu(int target, int key) {
     switch (key) {
         case '1':
             ckey_e1(target);
@@ -541,7 +568,8 @@ void ckey_emenu(int target, int key) {
     }
 }
 
-void ckey_e() {
+void
+ckey_e() {
     int target = input_select_rect("Edit rectangle: ");
     if (target == -1) return;
 
@@ -556,7 +584,8 @@ void ckey_e() {
     ckey_emenu(target, key);
 }
 
-void ckey_s() {
+void
+ckey_s() {
     int alive = rstate->plane->rect_alive;
     int dead = rstate->plane->rect_max - alive;
 
@@ -595,7 +624,8 @@ void ckey_s() {
     free(message);
 }
 
-int ckey_r() {
+int
+ckey_r() {
     int key = render_popup_getch("Restart? [y,r/N]");
     if (key == 'y' || key == 'r') {
         plane_t *p = rstate->plane;
@@ -613,9 +643,29 @@ int ckey_r() {
     return true;
 }
 
+int
+ckey_x() {
+    int key = render_popup_getch("Recombinate survivors? [y,x/N]");
+    if (key == 'y' || key == 'x') {
+        plane_t *p = rstate->plane;
+        render_unload();
+
+        int parents_num = p->rect_alive;
+        rec_t **parents = plane_select_alive(p);
+        plane_populate_recombinate(p, parents, parents_num, 10);
+        free(parents);
+
+        render_load(p);
+        render_status("Recombinated!");
+        return false;
+    }
+    return true;
+}
+
 /* FIXME messes up in-game time representation
  * pause should be defined in logic.c and used inside simulate func */
-int control_cycle() {
+int
+control_cycle() {
     /* check clock */
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -666,11 +716,17 @@ int control_cycle() {
                 if (is_restart) return false;
             }
             break;
+        case 'x':
+            {
+                int is_recombination = ckey_x();
+                if (is_recombination) return false;
+            }
+            break;
 
         /* TODO implement: 
          * e - edit rectangle interactively (table)
-         * m - move rectangle interactively (redraw) 
-         * r - restart */
+         * m - move rectangle interactively (redraw)
+         * */
 
         /*TODO define broad message box*/
 

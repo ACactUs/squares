@@ -23,7 +23,7 @@
 #define DETECT_DIST_MIN             2           /* rectangles will always detect objects at this distance */
 #define RECT_DELAY_MAX              20          /* all rectangles internal timer will wait no more than this*/
 #define RECT_DELAY_MIN              0.75        /* minimum time until timer triggers */
-#define RECTANGLE_INIT_MAX_RETRIES  10          /* stop retrying to spawn rectangle after x attempts*/
+#define RECTANGLE_INIT_MAX_RETRIES  25          /* stop retrying to spawn rectangle after x attempts*/
 
 /* time */
 #define TICK_NSEC                   33333333    /* 5000000LL => 500ticks/sec, number of ns between ticks*/
@@ -49,6 +49,7 @@
 /* IMPORTANT NOTICE
  * speed is given in distance units per second */
 
+/* [a, b] including borders */
 #define MAX(a,b) ((a) > (b) ? a : b)
 #define MIN(a,b) ((a) < (b) ? a : b)
 #define RAND(min, max) (min + rand() % (max-min+1))
@@ -99,27 +100,54 @@ typedef enum {
     SQ_NBLUE
 } SQ_COLORS;
 
-typedef struct rectanlge {
-    char name[16];                 //FIXME use char array instead
+/* contains inheritable traits */
+typedef struct genes {
+    unsigned int actions[A_NUMBER];
+    double traits[TIE_NUMBER];  /* array of traits, max index=TIE_NUMBER*/
+} genes_t;
+
+/* contains non-inheritable histoty */
+typedef struct personal {
+    char name[16];
     SQ_COLORS color;
     int frags;
+    int fights;
+} personal_t;
+
+/* manage rectangle history */
+typedef struct genealogy {
+    struct {
+        personal_t p;
+        genes_t g;
+        struct genealogy *next;
+    } left;
+    struct {
+        personal_t p;
+        genes_t g;
+        struct genealogy *next;
+    } right;
+    int refs;
+} genealogy_t;
+
+typedef struct rectanlge {
+    personal_t p;
+    genes_t g;
+    genealogy_t *ancestors;
     
     double y, x;
     double height, width;
-    double yspeed, xspeed;      /* real rectangle speed at any moment*/
-    double angle;               /* direction in which rectangle tries to move */
+    double yspeed, xspeed;      /* speed vector */
+    double angle;               /* intended direction */
     double energy;
     double energy_stored;
-
     double secs_idle;           /* number of seconds w/o stimuli */
-    double secs_timer;          /* used by any of action functs*/
-    int move_time;              /* ??? */
+    double secs_timer;          /* action-specific timer */
+    int move_time;              /* TODO */
 
-    unsigned int actions[A_NUMBER];
     enum actions prev_action;
-    double traits[TIE_NUMBER];  /* array of traits, max index=TIE_NUMBER*/
     int lock;                   /* pointer to rectangle which rect is locked to*/
-} rectangle_t;
+} rec_t;
+
 
 struct global_time {
     struct timespec tick_start;
@@ -165,45 +193,45 @@ void time_start_logic();
 void time_next();
 void time_next_nowait();
 
-rectangle_t *rectangle_create(); /*done*/
+rec_t *rec_create(); /*done*/
 
 /* sets all traits to defaults*/
-void rectangle_default_traits(rectangle_t *rect);
+void rec_default_traits(rec_t *rect);
 
-rectangle_t *rectangle_copy(rectangle_t *rect); /*done*/
+rec_t *rec_copy(rec_t *rect); /*done*/
 
-void rectangle_destroy(rectangle_t *rect); /*done*/
+void rec_destroy(rec_t *rect); /*done*/
 
-int rectangle_set_action(rectangle_t *rect, int index, double val); /*done*/
+int rec_set_action(rec_t *rect, int index, double val); /*done*/
 
-int rectangle_set_trait(rectangle_t *rect, int index, double val);  /*done*/
+int rec_set_trait(rec_t *rect, int index, double val);  /*done*/
 
-int rectangle_check_collision(rectangle_t *left, rectangle_t *right); /*done*/
+int rec_check_collision(rec_t *left, rec_t *right); /*done*/
 
 /* modifies rectangle so that it is now dest_size times bigger than original */
-void rectangle_resize_x(rectangle_t *rect, double ratio); /*done*/
-void rectangle_resize_y(rectangle_t *rect, double ratio); /*done*/
+void rec_resize_x(rec_t *rect, double ratio); /*done*/
+void rec_resize_y(rec_t *rect, double ratio); /*done*/
 
 
 /* return adress of winning rect,
  * if none returns NULL */
-rectangle_t *rectangle_compare(rectangle_t *left, rectangle_t *right); /*done*/
+rec_t *rec_compare(rec_t *left, rec_t *right); /*done*/
 
-size_t rectangle_represent(rectangle_t *rect, char **buff); /*done*/
-size_t rectangle_represent_fields(rectangle_t *rect, char **buff);  /*done*/
-size_t rectangle_represent_actions(rectangle_t *rect, char **buff); /*done*/
-size_t rectangle_represent_traits(rectangle_t *rect, char **buff);  /*done*/
+size_t rec_represent(rec_t *rect, char **buff); /*done*/
+size_t rec_represent_fields(rec_t *rect, char **buff);  /*done*/
+size_t rec_represent_actions(rec_t *rect, char **buff); /*done*/
+size_t rec_represent_traits(rec_t *rect, char **buff);  /*done*/
 
 size_t enumerate_actions(char **buf);   /*done*/
 size_t enumerate_action_values(char **buf, int action_index);   /*done*/
 size_t enumerate_traits(char **buf);    /*done*/
-double rectangle_size(rectangle_t *rect); /*done*/
+double rec_size(rec_t *rect); /*done*/
 
 typedef struct {
     double ysize, xsize;
     int rect_alive;
     int rect_max;    /*keeps max number of rects therefore can be used by calloc*/
-    rectangle_t **rects;
+    rec_t **rects;
     struct timespec ts_init;
     struct timespec ts_curr;
 } plane_t;
@@ -226,62 +254,63 @@ void action_food    (plane_t *plane, int index); /*partially*/
 void action_big     (plane_t *plane, int index); /*partially*/
 void action_prey    (plane_t *plane, int index); /*partially*/
 
-void rectangle_hibernate    (plane_t *plane, int index); 
-void rectangle_move_random  (plane_t *plane, int index); 
-void rectangle_move_lrandom (plane_t *plane, int index); 
-void rectangle_move_avoid   (plane_t *plane, int index); 
-void rectangle_move_seek    (plane_t *plane, int index); 
+void rec_hibernate    (plane_t *plane, int index); 
+void rec_move_random  (plane_t *plane, int index); 
+void rec_move_lrandom (plane_t *plane, int index); 
+void rec_move_avoid   (plane_t *plane, int index); 
+void rec_move_seek    (plane_t *plane, int index); 
 
 /* this function returns acceleration at current tick 
  * it also calculates energy spendings for acceleration
  * WARN function does not perform speed limit checks*/
-void rectangle_accelerate(rectangle_t *rect, double speed, double angle, double accel);
+void rec_accelerate(rec_t *rect, double speed, double angle, double accel);
 
 /*returns enum value of action which will be delegated to rectangle*/
-enum actions rectangle_action_get(plane_t *plane, int index); /*done*/
+enum actions rec_action_get(plane_t *plane, int index); /*done*/
 
 /*performs one of N possible actions determined by rectangle_action_get*/
-void rectangle_act(plane_t *plane, int index); /*done*/
+void rec_act(plane_t *plane, int index); /*done*/
 
 /* changes rectangle coordinates and resolves collisions for one tick 
  * breaks if index, plane or rectangle is invalid*/
-void rectangle_simulate(plane_t *plane, int index); /*done*/
+void rec_simulate(plane_t *plane, int index); /*done*/
 
 /* returns distance between two rectangles' *centers* */
-double rectangle_distance(rectangle_t *left, rectangle_t *right); /*TODO better estimate*/
+double rec_distance(rec_t *left, rec_t *right); /*TODO better estimate*/
 
 plane_t *plane_create(double xsize, double ysize); /*done*/
 
 /* if rects is NULL, plane will be initialized with random rects */
-void plane_init(plane_t *plane, rectangle_t **rects, int rects_size); /*done*/
+void plane_init(plane_t *plane, rec_t **rects, int rects_size); /*done*/
 void plane_populate_randomly(plane_t *plane, int rects_number); /*done*/
-void plane_populate_recombinate(plane_t *plane, rectangle_t **rects, int rects_number);
-void plane_populate_alive(plane_t *plane, rectangle_t **rects, int rects_number);
+rec_t **plane_select_alive(plane_t *plane);
+void plane_populate_recombinate(plane_t *plane, rec_t **parents, int parents_number, int children_number);
+void plane_populate_alive(plane_t *plane, rec_t **rects, int rects_number);
 
 /* need func which conditions plane reset*/
 void plane_destroy(plane_t *plane); /*done*/
 
-void plane_remove_rectangle(plane_t *plane, int index); /*done*/
+void plane_remove_rec(plane_t *plane, int index); /*done*/
 
 /* returns first collision rectangle index, sets flag true if collision happened*/
 int plane_check_collisions(plane_t *plane, int index); /*FIXME*/
 
 /* returns index of first rectanle which matches threshold */
-int plane_get_proximate_rectangle(plane_t *plane, int index, double mindist, enum size_diff_e type); /*done*/
+int plane_get_proximate_rec(plane_t *plane, int index, double mindist, enum size_diff_e type); /*done*/
 
 /* should be called on collision, manages rectagles fight only */
-void rectangle_collision_fight(plane_t *plane, int left, int right); /*done*/
+void rec_collision_fight(plane_t *plane, int left, int right); /*done*/
 
 /* completely resolves two rectangles collision recursively 
  * only spends collision tunneled movement
  * it may affect another rectangles */
-void rectangle_collision_resolve(plane_t *plane, int left); /*done*/
+void rec_collision_resolve(plane_t *plane, int left); /*done*/
 
 /* checks for and resolves borders collision in this iteration
  * returns true if resolution did happen, false if nothing was changed */
-int rectangle_borders_resolve(plane_t *plane, int index); /*TODO move code from rectangle_simulate */
+int rec_borders_resolve(plane_t *plane, int index); /*TODO move code from rec_simulate */
 
-/* safely returns true only if rectangle is alive, else return 0 */
+/* safely returns true only if rec is alive, else return 0 */
 int plane_is_rect_alive(plane_t *plane, int index);
 
 #endif
