@@ -643,23 +643,34 @@ ckey_r() {
     return true;
 }
 
+void 
+recombinate() {
+    plane_t *p = rstate->plane;
+    render_unload();
+
+    int parents_num = p->rect_alive;
+    rec_t **parents = plane_select_alive(p);
+    plane_populate_recombinate(p, parents, parents_num, 10);
+    free(parents);
+
+    render_load(p);
+    render_status("Recombinated!");
+}
+
 int
 ckey_x() {
     int key = render_popup_getch("Recombinate survivors? [y,x/N]");
     if (key == 'y' || key == 'x') {
-        plane_t *p = rstate->plane;
-        render_unload();
-
-        int parents_num = p->rect_alive;
-        rec_t **parents = plane_select_alive(p);
-        plane_populate_recombinate(p, parents, parents_num, 10);
-        free(parents);
-
-        render_load(p);
-        render_status("Recombinated!");
+        recombinate();
         return false;
     }
     return true;
+}
+
+void
+control_conditions() {
+    if (rstate->plane->rect_alive <= RECOMBINATE_SURVIVORS)
+        recombinate();
 }
 
 /* FIXME messes up in-game time representation
@@ -724,7 +735,6 @@ control_cycle() {
             break;
 
         /* TODO implement: 
-         * e - edit rectangle interactively (table)
          * m - move rectangle interactively (redraw)
          * */
 
@@ -732,8 +742,11 @@ control_cycle() {
 
         /* valid unused key*/
         default:
+            is_event = false;
             break;
     }
+
+    if (!is_event) control_conditions();
     
     /* reset clock */
     clock_gettime(CLOCK_MONOTONIC, &rstate->ts_last_input);

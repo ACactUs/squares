@@ -1,4 +1,5 @@
 #include "logic.h"
+#include <curses.h>
 #include <math.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -118,6 +119,12 @@ static void
     action_prey_functs
 };
 
+/* INITS */
+unsigned int rand_no_stim() { return (unsigned int)(rand() % SE_NUMBER);}
+unsigned int rand_food   () { return (unsigned int)(rand() % FE_NUMBER);}
+unsigned int rand_big    () { return (unsigned int)(rand() % BE_NUMBER);}
+unsigned int rand_prey   () { return (unsigned int)(rand() % PE_NUMBER);}
+
 void 
 rec_random_name(rec_t *rect) {
     int bufsize = sizeof(rect->p.name);
@@ -210,14 +217,20 @@ rec_create() {
     return rect;
 }
 
+unsigned int
+rand_action(int action_index) {
+    unsigned int (*actions[A_NUMBER]) (void) = {rand_no_stim, rand_food, rand_big, rand_prey};
+    return actions[action_index]();
+}
+
 rec_t *
 rec_create_rand() {
     rec_t *rect = rec_create();
 
-    rect->g.actions[a_no_stim ] = RANDOM_NO_STIM; 
-    rect->g.actions[a_food    ] = RANDOM_FOOD; 
-    rect->g.actions[a_big     ] = RANDOM_BIG; 
-    rect->g.actions[a_prey    ] = RANDOM_PREY; 
+    int i;
+    for (i = 0; i < A_NUMBER; i++)
+        rect->g.actions[i] = rand_action(i);
+
 
     rec_default_traits(rect);
     return rect;
@@ -1093,10 +1106,36 @@ rec_recombinate(rec_t *l, rec_t *r) {
     return child;
 }
 
+double
+trait_normalize(double val, int index) {
+    if (val < trait_min_vals[index])
+        return trait_min_vals[index];
+    if (val > trait_max_init_vals[index])
+        return trait_max_init_vals[index];
+    return val;
+}
+
+void
+rec_traits_normalize(rec_t *rect) {
+    int i;
+    for (i = 0; i < TIE_NUMBER; i++)
+        rect->g.traits[i] = trait_normalize(rect->g.traits[i], i);
+}
+
 void
 rec_mutate(rec_t *rect) {
-    //TODO mutation rate
-    return;
+    int i;
+    for (i = 0; i < A_NUMBER; i++)
+        if (DRAND(0, 1) <= ACTION_MUTATION_CHANCE)
+            rect->g.actions[i] = rand_action(i);
+
+    for (i = 0; i < TIE_NUMBER; i++) {
+        double lower, upper, val;
+        lower = rect->g.traits[i] - TRAIT_MUTATION_VARIABILITY/2;
+        upper = rect->g.traits[i] + TRAIT_MUTATION_VARIABILITY/2;
+        val = DRAND(lower, upper);
+        rect->g.traits[i] = trait_normalize(val, i);
+    }
 }
 
 /* empties plane, recombinates given rects, populates plane*/

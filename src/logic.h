@@ -34,11 +34,11 @@
 #define COLLISION_DELTA             (double)((double)SPEED_ABS_MAX * TICK_NSEC / NSEC_IN_SEC)
 #define GLOBAL_TIMER_STEP           TICK_NSEC   /* TODO */
 
-/* INITS */
-#define RANDOM_NO_STIM  (unsigned int)(rand() % SE_NUMBER)
-#define RANDOM_FOOD     (unsigned int)(rand() % FE_NUMBER)
-#define RANDOM_BIG      (unsigned int)(rand() % BE_NUMBER)
-#define RANDOM_PREY     (unsigned int)(rand() % PE_NUMBER)
+/* genetics */
+#define RECOMBINATE_SURVIVORS       3           /* plane_populate_recombinate after N survivors */
+#define ACTION_MUTATION_CHANCE      0.15
+#define TRAIT_MUTATION_VARIABILITY  0.10
+
 /* DEFAULT TRAITS
  * stored as DOUBLES
  * time in seconds,
