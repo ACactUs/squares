@@ -221,6 +221,7 @@ size_t rec_represent(rec_t *rect, char **buff); /*done*/
 size_t rec_represent_fields(rec_t *rect, char **buff);  /*done*/
 size_t rec_represent_actions(rec_t *rect, char **buff); /*done*/
 size_t rec_represent_traits(rec_t *rect, char **buff);  /*done*/
+size_t rec_represent_ancestors(rec_t *rect, char **lbuff, char **rbuff); /*done*/
 
 size_t enumerate_actions(char **buf);   /*done*/
 size_t enumerate_action_values(char **buf, int action_index);   /*done*/

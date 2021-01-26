@@ -231,13 +231,29 @@ rec_create_rand() {
     for (i = 0; i < A_NUMBER; i++)
         rect->g.actions[i] = rand_action(i);
 
-
     rec_default_traits(rect);
     return rect;
+}
+static void 
+destroy_ancestors(genealogy_t *g){
+    if (!g) return;
+    if (g->refs > 1) {
+        /* other pointers exist, deref and exit */
+        g->refs--;
+        return;
+    }
+
+    if (g->left.next) 
+        destroy_ancestors(g->left.next);
+    if (g->right.next)
+        destroy_ancestors(g->right.next);
+    free(g);
 }
 
 void
 rec_destroy(rec_t *rect) {
+    if (!rect) return;
+    destroy_ancestors(rect->ancestors);
     free(rect);
 }
 
@@ -300,11 +316,11 @@ rec_collision_fight(plane_t *plane, int left, int right) {
         if (!(rand() % 10)) 
             return;
         if (rand() % 2) {
-            rec_resize_x(lrect, 0.9f);
-            rec_resize_y(rrect, 0.9f);
+            rec_resize_x(lrect, 0.9);
+            rec_resize_y(rrect, 1.1);
         } else {
-            rec_resize_y(lrect, 0.9f);
-            rec_resize_x(rrect, 0.9f);
+            rec_resize_y(lrect, 1.1);
+            rec_resize_x(rrect, 0.9);
         }
     } else {
         //TODO
@@ -313,6 +329,8 @@ rec_collision_fight(plane_t *plane, int left, int right) {
         int looser = (winner == lrect) ? right : left;
         plane_remove_rec(plane, looser);
         winner->p.frags++;
+        rec_resize_x(winner, 1.2);
+        rec_resize_y(winner, 1.2);
     }
 }
 
@@ -881,10 +899,10 @@ rec_represent_fields(rec_t *rect, char **buff) {
     return size;
 }
 
-size_t
-rec_represent_actions(rec_t *rect, char **buff) {
+static size_t
+genes_represent_actions(genes_t *genes, char **buff) {
     size_t size;
-    if (!rect) return 0;
+    if (!genes) return 0;
 
     FILE *mstream = open_memstream(buff, &size);
     if (!mstream) return 0;
@@ -894,7 +912,7 @@ rec_represent_actions(rec_t *rect, char **buff) {
     /* print each action slot and its function */
     for (i = 0; i < A_NUMBER; i++) {
         fprintf(mstream, "%zu %-19s %s", 
-            i, action_slot_names[i], funames[i][rect->g.actions[i]]);
+            i, action_slot_names[i], funames[i][genes->actions[i]]);
         if (i + 1 != A_NUMBER) fprintf(mstream, "\n");
     }
 
@@ -902,10 +920,10 @@ rec_represent_actions(rec_t *rect, char **buff) {
     return size;
 }
 
-size_t
-rec_represent_traits(rec_t *rect, char **buff) {
+static size_t
+genes_represent_traits(genes_t *genes, char **buff) {
     size_t size;
-    if (!rect) return 0;
+    if (!genes) return 0;
 
     FILE *mstream = open_memstream(buff, &size);
     if (!mstream) return 0;
@@ -914,13 +932,67 @@ rec_represent_traits(rec_t *rect, char **buff) {
     size_t i;
     for (i = 0; i < TIE_NUMBER; i++) {
         fprintf(mstream, "%zu %-23s %f", 
-            i, trait_names[i], rect->g.traits[i]);
+            i, trait_names[i], genes->traits[i]);
         if (i + 1 != TIE_NUMBER) fprintf(mstream, "\n");
     }
 
     fclose(mstream);
     return size;
 }
+
+size_t 
+rec_represent_actions(rec_t *rect, char **buff) {
+    if (!rect) return 0;
+    return genes_represent_actions(&rect->g, buff);
+}
+
+size_t 
+rec_represent_traits(rec_t *rect, char **buff) {
+    if (!rect) return 0;
+    return genes_represent_traits(&rect->g, buff);
+}
+
+size_t 
+rec_represent_ancestors(rec_t *rect, char **lbuff, char **rbuff) {
+    size_t lsize, rsize;
+    if (!rect) return 1;
+
+    FILE *lstream = open_memstream(lbuff, &lsize);
+    if (!lstream) return 1;
+    FILE *rstream = open_memstream(rbuff, &rsize);
+    if (!rstream) return 1;
+
+    genealogy_t *g = rect->ancestors;
+
+    if (!g) {
+        fprintf(lstream, "%s is firstborn!\n", rect->p.name);
+        fclose(lstream);
+        fclose(rstream);
+        return 2;
+    }
+
+    char *message;
+    fprintf(lstream, "    ANCESTORS\n");
+    fprintf(lstream, "    [L]eft\n");
+    genes_represent_traits(&g->left.g, &message);
+    fprintf(lstream, "%s\n", message);
+    free(message);
+    genes_represent_actions(&g->left.g, &message);
+    fprintf(lstream, "%s", message);
+    free(message);
+    fprintf(rstream, "    [R]right\n");
+    genes_represent_traits(&g->right.g, &message);
+    fprintf(rstream, "%s", message);
+    free(message);
+    genes_represent_actions(&g->right.g, &message);
+    fprintf(rstream, "%s", message);
+    free(message);
+
+    fclose(lstream);
+    fclose(rstream);
+    return 0;
+}
+
 size_t
 rec_represent(rec_t *rect, char **buff) {
     size_t size;
@@ -1021,15 +1093,32 @@ static void
 plane_empty(plane_t *plane) {
     if (plane->rects) {
         int i;
-        for (i = 0; i < plane->rect_max; i++) {
-            if (plane->rects[i]) rec_destroy(plane->rects[i]);
-        }
+        for (i = 0; i < plane->rect_max; i++)
+            rec_destroy(plane->rects[i]);
         free(plane->rects);
     }
     plane->rect_max = 0;
     plane->rect_alive = 0;
     timer_reset(&plane->ts_init);
     timer_reset(&plane->ts_curr);
+}
+
+int 
+plane_get_smallest(plane_t *plane) {
+    int i, index;
+    double min;
+    min = rec_size(plane->rects[0]);
+    index = 0;
+    for (i = 1; i < plane->rect_max; i++) {
+        if (!plane->rects[i]) continue;
+        double cur;
+        cur = rec_size(plane->rects[i]);
+        if (cur < min) {
+            min = cur;
+            index = i;
+        }
+    }
+    return index;
 }
 
 void
@@ -1077,6 +1166,7 @@ plane_select_alive(plane_t *plane) {
 static void
 rec_assign_ancestors(rec_t *child, rec_t *l, rec_t *r) {
     genealogy_t *g = calloc(1, sizeof(genealogy_t));
+    g->refs = 1;
     g->left.g = l->g;
     g->left.p = l->p;
     g->left.next = l->ancestors;
@@ -1236,18 +1326,12 @@ rec_check_collision(rec_t *l, rec_t *r) {
     return 1;
 }
 
-void
-plane_null_rec(plane_t *plane, int index) {
-    if (!plane->rects[index]) return;
-    free(plane->rects[index]);
-    plane->rects[index] = NULL;
-}
-
 /* properly removes rec and destroys it */
 void
 plane_remove_rec(plane_t *plane, int index) {
-    if (!plane->rects[index]) return;
-    plane_null_rec(plane, index);
+    if (!plane->rects[index]) return; 
+    rec_destroy(plane->rects[index]);
+    plane->rects[index] = NULL;
     plane->rect_alive--;
 }
 

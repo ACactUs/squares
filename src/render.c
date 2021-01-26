@@ -425,6 +425,30 @@ ckey_p() {
     free(message);
 }
 
+void
+ckey_a() {
+    int target = input_select_rect("Print rectangle ancestors: ");
+    if (target == -1) return;
+
+    render_status("Printing");
+    rec_t *rect = rstate->plane->rects[target];
+
+    char *lmsg, *rmsg;
+    size_t rc = rec_represent_ancestors(rect, &lmsg, &rmsg);
+    if (rc == 1) return;
+    if (rc == 2) {
+        render_popup_getch(lmsg);
+        free(lmsg);
+        free(rmsg);
+        return;
+    }
+
+    render_popup_getch(lmsg);
+    render_popup_getch(rmsg);
+    free(lmsg);
+    free(rmsg);
+}
+
 /* move left corner */
 void
 ckey_e1(int target) {
@@ -702,12 +726,15 @@ control_cycle() {
             break;
         case 'h':
             {
-                char *message = "HELP\n------------\n[h]: see help\n[s]: statistics\n[e]: edit rectangle\n[k]: kill rectangle\n[r]: restart\n[q]: quit :(\nSPACE: pause game";
+                char *message = "HELP\n------------\n[h]: see help\n[p]: print\n[a]: show ancestors\n[s]: statistics\n[e]: edit rectangle\n[k]: kill rectangle\n[r]: restart\n[q]: quit :(\nSPACE: pause game";
                 render_popup_getch(message);
             }
             break;
         case 'p':
             ckey_p();
+            break;
+        case 'a':
+            ckey_a();
             break;
         case 'e':
             ckey_e();
