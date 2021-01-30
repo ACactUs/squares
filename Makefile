@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -Wconversion -std=gnu99
-LFLAGS = -lm -lncurses
+LFLAGS = -lm -lncurses -ltinfo
 BUILDFLAGS = -Os
 DBGFLAGS = -ggdb -g3 -O0
 
