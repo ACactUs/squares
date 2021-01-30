@@ -21,14 +21,14 @@
 #define ACCEL_ABS_MIN               0           
 #define DETECT_DIST_MAX             50          /* rectangles cant detect objects further than this */
 #define DETECT_DIST_MIN             2           /* rectangles will always detect objects at this distance */
-#define RECT_DELAY_MAX              20          /* all rectangles internal timer will wait no more than this*/
+#define RECT_DELAY_MAX              20          /* rectangle's internal timer will wait no more than this*/
 #define RECT_DELAY_MIN              0.75        /* minimum time until timer triggers */
 #define RECTANGLE_INIT_MAX_RETRIES  25          /* stop retrying to spawn rectangle after x attempts*/
+#define BOUNCE_SPEED_FINE           0.4         /* TODO spd = spd - spd*fine */
 
 /* time */
 #define TICK_NSEC                   33333333    /* 5000000LL => 500ticks/sec, number of ns between ticks*/
 #define NSEC_IN_SEC                 1000000000LL 
-#define BOUNCE_SPEED_FINE           0.4         /* spd = spd - spd*fine*/
 
 /* derivative defines */
 #define COLLISION_DELTA             (double)((double)SPEED_ABS_MAX * TICK_NSEC / NSEC_IN_SEC)
@@ -94,6 +94,7 @@ typedef struct {
 
 int mutate(int eo_target, int e_number, float rate); 
 
+// TODO
 typedef enum {
     SQ_RED,
     SQ_GREEN,
@@ -103,7 +104,7 @@ typedef enum {
 /* contains inheritable traits */
 typedef struct genes {
     unsigned int actions[A_NUMBER];
-    double traits[TIE_NUMBER];  /* array of traits, max index=TIE_NUMBER*/
+    double traits[TIE_NUMBER]; 
 } genes_t;
 
 /* contains non-inheritable histoty */
@@ -145,9 +146,8 @@ typedef struct rectanlge {
     int move_time;              /* TODO */
 
     enum actions prev_action;
-    int lock;                   /* pointer to rectangle which rect is locked to*/
+    int lock;                   /* index of target rectangle*/
 } rec_t;
-
 
 struct global_time {
     struct timespec tick_start;
@@ -155,13 +155,15 @@ struct global_time {
     struct timespec lost_time;
 };
 
+
+/* tables defined in logic.c */
 /* action index size tables */
 extern const unsigned int action_enums_size[];
 
 /* action user string tables */
 extern const char *action_slot_names[];
 /*TODO append action_ to these names*/
-extern const char **funames         []; /* contains lower 4 arrays */
+extern const char **funames         []; /* contains 4 arrays below*/
 extern const char *funames_no_stim  [];
 extern const char *funames_food     [];
 extern const char *funames_big      [];
@@ -174,15 +176,11 @@ extern const double trait_max_vals [];
 /* trait user string tables */
 extern const char *trait_names      [];
 
-
-
-
 extern struct global_time GLOBAL_TIME;
 
 /* checks if timer elapsed
- * if elapsed sets timer to current time and returnt true
+ * if elapsed sets timer to current time and return true
  * if not returns false*/
-//TODO move all duplicate code
 void timer_waitreset(struct timespec *start, long long nsecs);
 void timer_reset(struct timespec *start);
 void timer_wait(struct timespec *start, long long nsecs);
@@ -208,10 +206,9 @@ int rec_set_trait(rec_t *rect, int index, double val);  /*done*/
 
 int rec_check_collision(rec_t *left, rec_t *right); /*done*/
 
-/* modifies rectangle so that it is now dest_size times bigger than original */
+/* modifies rectangle so that it is now ratio times bigger than original */
 void rec_resize_x(rec_t *rect, double ratio); /*done*/
 void rec_resize_y(rec_t *rect, double ratio); /*done*/
-
 
 /* return adress of winning rect,
  * if none returns NULL */
@@ -231,12 +228,13 @@ double rec_size(rec_t *rect); /*done*/
 typedef struct {
     double ysize, xsize;
     int rect_alive;
-    int rect_max;    /*keeps max number of rects therefore can be used by calloc*/
+    int rect_max;
     rec_t **rects;
     struct timespec ts_init;
     struct timespec ts_curr;
 } plane_t;
-/*
+
+/* ???
 extern void (** const action_functs      [])(plane_t *, int);
 extern void (* const action_nostim_functs[])(plane_t *, int);
 extern void (* const action_food_functs  [])(plane_t *, int);
@@ -250,10 +248,10 @@ void frame_simulate(plane_t *plane); /*ticks chosen*/
 
 /* these functions are not responsible for rectangle movement simulation,
  * they only change rectangle state as it is dictated by behaviour vars*/
-void action_nostim  (plane_t *plane, int index); /*partially*/
-void action_food    (plane_t *plane, int index); /*partially*/
-void action_big     (plane_t *plane, int index); /*partially*/
-void action_prey    (plane_t *plane, int index); /*partially*/
+void action_nostim  (plane_t *plane, int index);
+void action_food    (plane_t *plane, int index);
+void action_big     (plane_t *plane, int index);
+void action_prey    (plane_t *plane, int index);
 
 void rec_hibernate    (plane_t *plane, int index); 
 void rec_move_random  (plane_t *plane, int index); 
@@ -262,8 +260,8 @@ void rec_move_avoid   (plane_t *plane, int index);
 void rec_move_seek    (plane_t *plane, int index); 
 
 /* this function returns acceleration at current tick 
- * it also calculates energy spendings for acceleration
- * WARN function does not perform speed limit checks*/
+ * TODO calculate energy spendings for acceleration
+ * function does not perform speed limit checks*/
 void rec_accelerate(rec_t *rect, double speed, double angle, double accel);
 
 /*returns enum value of action which will be delegated to rectangle*/
@@ -277,7 +275,7 @@ void rec_act(plane_t *plane, int index); /*done*/
 void rec_simulate(plane_t *plane, int index); /*done*/
 
 /* returns distance between two rectangles' *centers* */
-double rec_distance(rec_t *left, rec_t *right); /*TODO better estimate*/
+double rec_distance(rec_t *left, rec_t *right);
 
 plane_t *plane_create(double xsize, double ysize); /*done*/
 
@@ -288,13 +286,14 @@ rec_t **plane_select_alive(plane_t *plane);
 void plane_populate_recombinate(plane_t *plane, rec_t **parents, int parents_number, int children_number);
 void plane_populate_alive(plane_t *plane, rec_t **rects, int rects_number);
 
-/* need func which conditions plane reset*/
+/* TODO func which resets plane conditionally */
+
 void plane_destroy(plane_t *plane); /*done*/
 
 void plane_remove_rec(plane_t *plane, int index); /*done*/
 
 /* returns first collision rectangle index, sets flag true if collision happened*/
-int plane_check_collisions(plane_t *plane, int index); /*FIXME*/
+int plane_check_collisions(plane_t *plane, int index);
 
 /* returns index of first rectanle which matches threshold */
 int plane_get_proximate_rec(plane_t *plane, int index, double mindist, enum size_diff_e type); /*done*/
@@ -309,7 +308,7 @@ void rec_collision_resolve(plane_t *plane, int left); /*done*/
 
 /* checks for and resolves borders collision in this iteration
  * returns true if resolution did happen, false if nothing was changed */
-int rec_borders_resolve(plane_t *plane, int index); /*TODO move code from rec_simulate */
+int rec_borders_resolve(plane_t *plane, int index);
 
 /* safely returns true only if rec is alive, else return 0 */
 int plane_is_rect_alive(plane_t *plane, int index);

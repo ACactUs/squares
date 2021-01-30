@@ -19,7 +19,6 @@ render_greeting() {
         rstate->plane->rect_max);
 
     render_status("Status initialized..... OK");
-    //box(0, 0);
     render_popup_getch(message);
     wrefresh(rstate->canvas);
 }
@@ -99,10 +98,6 @@ render_rec(int index) {
             wgetch(rstate->status);
             return;
         }
-
-        //resize 1x1 TODO
-        //move
-        //resize h*w
     }
     
     box(win, 0, 0);
@@ -321,7 +316,7 @@ input_int(char *prompt, int *res) {
     return 1;
 }
 
-/* WARN string must be freed after use */
+/* string must be freed after use */
 char *
 input_string(char *prompt) {
     WINDOW *win = rstate->status;
@@ -367,7 +362,6 @@ input_2doubles(char *message, double *a, double *b) {
         render_status("Input failed");
         return 0;
     }
-
     *a = x;
     *b = y;
     return 1;
@@ -380,7 +374,7 @@ input_select_rect(char *prompt) {
     noecho();
 
     if (is_success) {
-        if (plane_is_rect_alive(rstate->plane, target)) { //FIXME target may be uninitialized
+        if (plane_is_rect_alive(rstate->plane, target)) {
             return target;
         } else {
             render_status("Rectangle does not exist");
@@ -656,7 +650,7 @@ ckey_r() {
         render_unload();
         plane_destroy(p);
 
-        /* TODO ask user to fill fields 
+        /* TODO add options
          * TODO create plane from rstate as new funct */
         p = plane_create((rstate->canv_maxx+1) / rstate->char_htw, rstate->canv_maxy+1);
         plane_populate_randomly(p, 10);
@@ -765,7 +759,7 @@ control_cycle() {
          * m - move rectangle interactively (redraw)
          * */
 
-        /*TODO define broad message box*/
+        /* TODO define broad message box*/
 
         /* valid unused key*/
         default:

@@ -84,7 +84,7 @@ static void
 };
 
 /* duplicate code because during later development I plan to have
- * independent functions for each actions 
+ * independent functions for each action
  * I implemented jump logic now, so I can separate them later */
 
 /* notice the difference between [] on this function and *const*const on 3 below
@@ -288,7 +288,7 @@ rec_set_action(rec_t *rect, int index, double val) {
     rect->g.actions[index] = a_index;
     return 1;
 }
-//TODO
+
 int
 rec_set_trait(rec_t *rect, int index, double val) {
     if (!rect) return 0;
@@ -348,7 +348,7 @@ rec_get_angle(rec_t *rect, rec_t *target) {
     x2 = target->x;
     y2 = target->x;
     
-    return atan2(y2 - y1, x2 - x1) - 3.1415/2;
+    return atan2(y2 - y1, x2 - x1) - M_PI/2;
 }
 
 double
@@ -391,7 +391,7 @@ rec_accelerate(rec_t *rect, double speed, double angle, double accel) {
         angle -= M_PI*1.5;
         x_dst = speed * sin(angle);
         y_dst = speed * cos(angle);
-    } else exit(1); //TODO ASSERT
+    } else exit(1);
 
     double d_sec;
     d_sec = (double)TICK_NSEC / NSEC_IN_SEC;
@@ -437,20 +437,15 @@ rec_accelerate(rec_t *rect, double speed, double angle, double accel) {
 }
 
 void
-rec_TESTMOVE     (plane_t *plane, int index) { 
-    //FIXME redirecting to move_random
+rec_TESTMOVE(plane_t *plane, int index) { 
     rec_move_random(plane, index);
     return;
 }
 
 
-/* TODO rec_drift action: dont change speed at all
- * TODO traits must be kept up to date by another function
- * it must be called on initialize or traits change 
- * like: if (speed > SPEED_ABS_MAX) speed = SPEED_ABS_MAX; 
- * */
+/* TODO rec_drift action: dont change speed at all */
 void
-rec_hibernate    (plane_t *plane, int index) { 
+rec_hibernate(plane_t *plane, int index) { 
     double angle, accel;
     rec_t *rect = plane->rects[index];
     accel = rect->g.traits[ti_accel];
@@ -460,7 +455,7 @@ rec_hibernate    (plane_t *plane, int index) {
 }
 
 void
-rec_move_random  (plane_t *plane, int index) { 
+rec_move_random(plane_t *plane, int index) { 
     rec_t *rect = plane->rects[index];
     double angle = rect->angle;
     if (rect->secs_timer >= rect->g.traits[ti_mrandom_delay]) {
@@ -474,10 +469,10 @@ rec_move_random  (plane_t *plane, int index) {
 }
 
 void
-rec_move_lrandom (plane_t *plane, int index) { rec_TESTMOVE(plane, index); }
+rec_move_lrandom(plane_t *plane, int index) { rec_TESTMOVE(plane, index); }
 
 void
-rec_move_avoid   (plane_t *plane, int index) { 
+rec_move_avoid(plane_t *plane, int index) { 
     double angle, speed, accel;
     rec_t *rect, *target;
     rect = plane->rects[index];
@@ -493,7 +488,7 @@ rec_move_avoid   (plane_t *plane, int index) {
 }
 
 void 
-rec_move_seek    (plane_t *plane, int index) {
+rec_move_seek(plane_t *plane, int index) {
     double angle, speed, accel;
     rec_t *rect, *target;
     rect = plane->rects[index];
@@ -507,7 +502,6 @@ rec_move_seek    (plane_t *plane, int index) {
     rec_accelerate(rect, speed, angle, accel);
 }
 
-/* FIXME deprecated */
 void
 timer_wait(struct timespec *start, long long nsecs) {
     struct timespec ts;
@@ -516,7 +510,6 @@ timer_wait(struct timespec *start, long long nsecs) {
                                     + ts.tv_nsec - start->tv_nsec;
 
     if (nsec_elapsed < nsecs) {
-        //clock_gettime(CLOCK_REALTIME, &start);
         long long wait_nsec = nsecs - nsec_elapsed;
         ts.tv_sec  = 0;
         while (wait_nsec >= NSEC_IN_SEC) {
@@ -645,7 +638,7 @@ rec_act(plane_t *plane, int index) {
         }
     }
 
-    //* rec->action[nact][key]: nact >0, nact <A_NUMBER; key>0, key<action_enums_size[nact]*/
+    /* rec->action[nact][key]: nact >0, nact <A_NUMBER; key>0, key<action_enums_size[nact]*/
     if (action < 0 || action >= A_NUMBER) {
         /* invalid action index*/
         fprintf(stderr, "at logic.c - rec_act - invalid action variable\n");
@@ -667,7 +660,6 @@ rec_act(plane_t *plane, int index) {
 
 int
 rec_borders_resolve(plane_t *plane, int index) {
-    //FIXME MOVE CODE
     rec_t *r = plane->rects[index];
     /* up */
     if (r->y < 0 ) {
@@ -750,7 +742,6 @@ col_apply(rec_t *r, double *xovershoot, double *yovershoot) {
 }
 
 /* lol clear bloat */
-/*if rectangle gets teleported out of plane, program crashes*/
 void
 rec_collision_resolve(plane_t *plane, int index) {
     if (!plane->rects[index]) return; /* rec was killed, exit recursion */
@@ -761,8 +752,7 @@ rec_collision_resolve(plane_t *plane, int index) {
         if(rec_borders_resolve(plane, index))
             rec_collision_resolve(plane, index);
         return; 
-        /* no rect collision and no border collision exit recursion 
-         * or terminate exiting recursion */
+        /* no rect collision and no border collision exit recursion */
     }
 
     /* rect collision happened, resolve by tunneling distance then go deeper */
@@ -773,7 +763,7 @@ rec_collision_resolve(plane_t *plane, int index) {
      * udlr - up, down, left, right; strictly
      * vh   - vertically, horizontally */
     int iu, id, il, ir, iv, ih;
-    /* WARN these variables duplicate in rec_check_collision 
+    /* these variables duplicate in rec_check_collision 
      * TODO rec_check_collision should return enum of collision direction
      * to remove duplicate code. This function should use provided enums 
      * instead of making checks itself
@@ -855,12 +845,7 @@ rec_simulate(plane_t *plane, int index) {
     ny = rect->y + (rect->yspeed) * (double)((long double)TICK_NSEC/(long double)NSEC_IN_SEC);
     rect->x = nx;
     rect->y = ny;
-
-    //FIXME this function does not yet respect rec actions
     
-    /* continue checks untill resolved, 
-     * if no changes were made during iteration, unset unresolved flag */
-    //FIXME move code to borders_resolve
     rec_collision_resolve(plane, index);
 }
 
@@ -1086,7 +1071,6 @@ static void
 rec_relocate_randomly(plane_t *plane, rec_t *rect) {
     rect->x         = rand() % (int)(plane->xsize - rect->width);
     rect->y         = rand() % (int)(plane->ysize - rect->height);
-    //TODO initialize actions randomly
 }
 
 static void
@@ -1288,11 +1272,11 @@ plane_destroy(plane_t *plane) {
 
 
 /* Checks for collisions for rec of given index 
- * WARN assumes that index is valid 
+ * assumes that index is valid 
  * this function does not check for NULL rectangles at index 
  * return int index of collision rec
  * return -1 if not collided
- * FIXME complexity O(N) for each rectangle, O(N**2) per tick
+ * FIXME complexity O(N**2) per tick
  * TODO keep recs in tree data structure or divide planes into sectors */
 int
 plane_check_collisions(plane_t *plane, int index) {
@@ -1308,7 +1292,7 @@ plane_check_collisions(plane_t *plane, int index) {
     return -1;
 }
 
-/* WARN function assumes that left and right exist and were initialized correctly*/
+/* function assumes that left and right exist and were initialized correctly*/
 int
 rec_check_collision(rec_t *l, rec_t *r) {
     /*TODO return enum of collision direction instead*/
@@ -1335,7 +1319,7 @@ plane_remove_rec(plane_t *plane, int index) {
     plane->rect_alive--;
 }
 
-/* returns index of FIRST MATCH which is at least double mindist close */
+/* returns index of FIRST MATCH which is at least mindist close */
 int
 plane_get_proximate_rec(plane_t *plane, int index, double mindist, enum size_diff_e type) {
     int i, max;

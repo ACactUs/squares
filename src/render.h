@@ -18,7 +18,7 @@ enum zoom       { zo_none };
 enum color_pairs{ cp_wb=1, cp_bw };
 
 typedef struct {
-    enum zoom zoom;          /*selected zoom level*/
+    enum zoom zoom;          /* TODO selected zoom level*/
     int  maxx, maxy;         /*terminal window size*/
     double char_htw;         /*terminal width to height ration*/
     int canv_maxx, canv_maxy;/*size of window where rectangles will be rendered*/
@@ -44,7 +44,6 @@ struct popup_state {
 
 extern render_state_t *rstate;
 
-
 /********************************
  *      RENDER FUNCTIONS        *
  ********************************/
@@ -57,7 +56,7 @@ void render_unload(); /*done*/
 
 void render_greeting(); /*done*/
 
-void zoom_set(plane_t *plane); 
+void zoom_set(plane_t *plane); /*TODO*/
 
 void render_frame(); /*done*/
 
@@ -67,15 +66,11 @@ void render_status(char *message); /*done*/
 
 void render_clear_status(); /*done*/
 
-int render_popup_getch(char *message);
-
-/******************************
- * USER INTERACTION FUNCTIONS *
- ******************************/
+int render_popup_getch(char *message); /*done*/
 
 /* all user input is processed here
  * depends on ts_last_input timer
  * input freq is defined by INPUT_NSEC in header 
  * this function should only handle user input and then call 
  * functions from logic.h, to modify plane_t state */
-int control_cycle();
+int control_cycle(); /*done*/

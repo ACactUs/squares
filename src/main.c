@@ -25,8 +25,5 @@ main(){
         time_next();
     }
 
-    /* TODO write user interface and exit/reload plane on wgetch 
-    render_exit();
-    */
     return 0;
 }
