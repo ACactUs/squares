@@ -726,7 +726,7 @@ control_cycle() {
             break;
         case 'h':
             {
-                char *message = "HELP\n------------\n[h]: see help\n[p]: print\n[a]: show ancestors\n[s]: statistics\n[e]: edit rectangle\n[k]: kill rectangle\n[r]: restart\n[q]: quit :(\nSPACE: pause game";
+                char *message = "HELP\n------------\n[h]: see help\n[p]: print\n[a]: show ancestors\n[s]: statistics\n[e]: edit rectangle\n[k]: kill rectangle\n[r]: restart\n[x]: Recombinate survivors\n[q]: quit :(\nSPACE: pause game";
                 render_popup_getch(message);
             }
             break;
