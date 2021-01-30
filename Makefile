@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -Wconversion -std=gnu99
-LFLAGS = -lm -lncurses
+LDLIBS = -lm -lncurses -ltinfo
 BUILDFLAGS = -Os
 DBGFLAGS = -ggdb -g3 -O0
 
@@ -16,7 +16,7 @@ profile: CFLAGS += -pg
 profile: clean build
 
 squares: logic.o render.o main.o
-	$(CC) $(CFLAGS) $(LFLAGS) -o out $^
+	$(CC) $(CFLAGS) -o out $^ $(LDLIBS)
 
 logic.o: src/logic.c src/logic.h
 	$(CC) $(CFLAGS) -c $<
